@@ -21,6 +21,7 @@
     "@mantine/notifications": "^7.17.2",
     "@mantine/tiptap": "7.17.2",
     "@mdxeditor/editor": "^3.33.0",
+    "@octokit/plugin-throttling": "^11.0.1",
     "@prisma/client": "^6.6.0",
     "@privy-io/react-auth": "^2.8.2",
     "@privy-io/server-auth": "^1.19.3",

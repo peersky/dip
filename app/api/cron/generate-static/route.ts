@@ -1,27 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Octokit } from "octokit";
+import { Octokit as OctokitCore } from "@octokit/core";
+import { restEndpointMethods, RestEndpointMethodTypes } from "@octokit/plugin-rest-endpoint-methods";
+import { throttling, ThrottlingOptions } from "@octokit/plugin-throttling";
 import { kv } from "@vercel/kv";
 import matter from "gray-matter";
 
 // Add dynamic configuration for static export
 export const dynamic = "force-dynamic";
 
+const Octokit = OctokitCore.plugin(restEndpointMethods, throttling);
+
 interface EipMetadata {
   number: string;
   title: string;
-  description?: string; // Optional as not all EIPs might have it in frontmatter
+  description?: string;
   author: string;
   status: string;
   type: string;
   category?: string;
   created: string;
-  lastModified?: string; // This will be set by us
+  lastModified?: string;
   discussionsTo?: string;
   requires?: string[];
-  content: string; // Full markdown content
+  content: string;
   sha: string;
   path: string;
-  protocol: string; // Added to identify the protocol
+  protocol: string;
 }
 
 interface RepositoryConfig {
@@ -29,8 +33,8 @@ interface RepositoryConfig {
   repo: string;
   branch: string;
   eipsFolder: string;
-  protocol: string; // e.g., "ethereum", "arbitrum"
-  proposalPrefix: string; // e.g., "EIP", "AIP"
+  protocol: string;
+  proposalPrefix: string;
 }
 
 const repositories: RepositoryConfig[] = [
@@ -47,7 +51,7 @@ const repositories: RepositoryConfig[] = [
     repo: "RIPs",
     branch: "master",
     eipsFolder: "RIPS",
-    protocol: "rollup", // Assuming "rollup" is the protocol key for RIPs
+    protocol: "rollup",
     proposalPrefix: "RIP",
   },
   {
@@ -66,118 +70,202 @@ const repositories: RepositoryConfig[] = [
     protocol: "arbitrum",
     proposalPrefix: "AIP",
   },
-  // Add more repositories as needed
 ];
 
-// Updated to use gray-matter and be more flexible
-function parseEipData(markdownContent: string, protocol: string): { metadata: Partial<EipMetadata>; mainContent: string } {
+function parseEipData(markdownContent: string, protocol: string, filePath: string): { metadata: Partial<Omit<EipMetadata, "content" | "sha" | "path" | "lastModified">>; mainContent: string; parsingIssues: string[] } {
   const { data: frontmatter, content: mainContent } = matter(markdownContent);
+  const issues: string[] = [];
 
-  const metadata: Partial<EipMetadata> = {
-    title: frontmatter.title,
-    description: frontmatter.description,
-    author: frontmatter.author,
-    status: frontmatter.status,
-    type: frontmatter.type,
-    category: frontmatter.category,
-    created: frontmatter.created ? new Date(frontmatter.created).toISOString() : undefined,
-    discussionsTo: frontmatter["discussions-to"],
-    requires: frontmatter.requires ? (typeof frontmatter.requires === "string" ? frontmatter.requires.split(",").map((r: string) => r.trim()) : Array.isArray(frontmatter.requires) ? frontmatter.requires.map(String) : []) : [],
+  const getString = (key: string, defaultValue: string | undefined = undefined, isCritical = false): string | undefined => {
+    const value = frontmatter[key] || frontmatter[key.toLowerCase()];
+    if (value === undefined && defaultValue === undefined && isCritical) issues.push(`Missing critical field '${key}'`);
+    return value !== undefined ? String(value) : defaultValue;
+  };
+
+  const getDateString = (key: string, defaultValue: string | undefined = undefined, isCritical = false): string | undefined => {
+    const value = frontmatter[key] || frontmatter[key.toLowerCase()];
+    if (value === undefined && defaultValue === undefined && isCritical) {
+      if (isCritical) issues.push(`Missing critical field '${key}'`);
+      return defaultValue;
+    }
+    try {
+      return value ? new Date(value).toISOString() : defaultValue;
+    } catch (e) {
+      issues.push(`Invalid date format for field '${key}': ${value}`);
+      return defaultValue;
+    }
+  };
+
+  const getStringArray = (key: string): string[] => {
+    const value = frontmatter[key] || frontmatter[key.toLowerCase()];
+    if (value === undefined) return [];
+    if (typeof value === "string")
+      return value
+        .split(",")
+        .map((r: string) => r.trim())
+        .filter(Boolean);
+    if (Array.isArray(value)) return value.map(String).filter(Boolean);
+    return [];
+  };
+
+  const metadata: Partial<Omit<EipMetadata, "content" | "sha" | "path" | "lastModified">> = {
+    title: getString("title", `Proposal from ${filePath}`, true),
+    description: getString("description"),
+    author: getString("author", "Unknown Author", true),
+    status: getString("status", "Draft", true),
+    type: getString("type", "Unknown Type", true),
+    category: getString("category"),
+    created: getDateString("created", new Date(0).toISOString(), true),
+    discussionsTo: getString("discussions-to") || getString("discussions_to"),
+    requires: getStringArray("requires"),
     protocol: protocol,
   };
-  return { metadata, mainContent };
+
+  if (issues.length > 0) {
+    console.warn(`WARN: [${filePath}] Frontmatter parsing issues: ${issues.join("; ")}. Raw frontmatter: ${JSON.stringify(frontmatter).substring(0, 300)}...`);
+  }
+
+  return { metadata, mainContent, parsingIssues: issues };
 }
 
-// Updated to use proposalPrefix
 function extractProposalNumber(filename: string, proposalPrefix: string): string | null {
   const regex = new RegExp(`(?:${proposalPrefix.toLowerCase()})-(\\d+)\\.md$`, "i");
   const match = filename.match(regex);
   return match ? match[1] : null;
 }
 
+// Define types for Octokit tree items
+interface OctokitTreeItem {
+  path?: string;
+  mode?: string;
+  type?: "blob" | "tree" | "commit" | string; // Allow string for broader compatibility
+  sha?: string | null; // SHA can be null for submodules
+  size?: number;
+  url?: string;
+}
+
 async function fetchProposalsFromRepository(config: RepositoryConfig): Promise<EipMetadata[]> {
+  // Explicitly type the octokit instance with the plugins
   const octokit = new Octokit({
-    auth: process.env.GITHUB_TOKEN, // Optional: for higher rate limits
+    auth: process.env.GITHUB_TOKEN,
+    throttle: {
+      onRateLimit: (retryAfter: number, options: any, octokitInstance: InstanceType<typeof Octokit>, retryCount: number) => {
+        octokitInstance.log.warn(`Request quota exhausted for request ${options.method} ${options.url}`);
+        if (retryCount < 3) {
+          octokitInstance.log.info(`Retrying after ${retryAfter} seconds!`);
+          return true;
+        }
+      },
+      onSecondaryRateLimit: (retryAfter: number, options: any, octokitInstance: InstanceType<typeof Octokit>) => {
+        octokitInstance.log.warn(`Secondary rate limit hit for ${options.method} ${options.url}`);
+        return true;
+      },
+    } as ThrottlingOptions,
   });
 
   try {
-    console.log(`INFO: Fetching ${config.proposalPrefix}s from ${config.owner}/${config.repo}/${config.eipsFolder}`);
+    console.log(`INFO: Fetching ${config.proposalPrefix}s from ${config.owner}/${config.repo}, branch ${config.branch}, folder ${config.eipsFolder}`);
 
-    const { data: files } = await octokit.rest.repos.getContent({
+    const { data: branchData } = await octokit.rest.repos.getBranch({
       owner: config.owner,
       repo: config.repo,
-      path: config.eipsFolder,
-      ref: config.branch,
+      branch: config.branch,
+    });
+    const rootTreeSha = branchData.commit.commit.tree.sha;
+
+    const { data: rootTree } = await octokit.rest.git.getTree({
+      owner: config.owner,
+      repo: config.repo,
+      tree_sha: rootTreeSha,
     });
 
-    if (!Array.isArray(files)) {
-      console.error(`ERROR: Expected directory listing for ${config.owner}/${config.repo}/${config.eipsFolder}, but got different type.`);
+    const eipsFolderEntry = rootTree.tree.find((item: OctokitTreeItem) => item.path === config.eipsFolder && item.type === "tree");
+    if (!eipsFolderEntry || !eipsFolderEntry.sha) {
+      console.error(`ERROR: Could not find folder SHA for ${config.eipsFolder} in ${config.owner}/${config.repo}`);
+      return [];
+    }
+    const eipsFolderTreeSha = eipsFolderEntry.sha;
+
+    const { data: eipsFolderTree } = await octokit.rest.git.getTree({
+      owner: config.owner,
+      repo: config.repo,
+      tree_sha: eipsFolderTreeSha,
+      recursive: "1",
+    });
+
+    if (!eipsFolderTree.tree) {
+      console.error(`ERROR: No tree found for ${config.owner}/${config.repo}/${config.eipsFolder}`);
       return [];
     }
 
-    const proposalFiles = files.filter((file) => file.type === "file" && file.name.endsWith(".md") && extractProposalNumber(file.name, config.proposalPrefix));
+    const proposalFileEntries = eipsFolderTree.tree.filter((item: OctokitTreeItem) => item.type === "blob" && item.path && item.path.endsWith(".md") && extractProposalNumber(item.path.split("/").pop() || "", config.proposalPrefix));
 
-    console.log(`INFO: Found ${proposalFiles.length} ${config.proposalPrefix} files in ${config.owner}/${config.repo}`);
+    console.log(`INFO: Found ${proposalFileEntries.length} potential ${config.proposalPrefix} files in ${config.owner}/${config.repo}/${config.eipsFolder} tree.`);
 
     const proposals: EipMetadata[] = [];
-    const batchSize = 10; // Process files in batches
+    const batchSize = 5;
 
-    for (let i = 0; i < proposalFiles.length; i += batchSize) {
-      const batch = proposalFiles.slice(i, i + batchSize);
-      const batchPromises = batch.map(async (file) => {
+    for (let i = 0; i < proposalFileEntries.length; i += batchSize) {
+      const batch = proposalFileEntries.slice(i, i + batchSize);
+      const batchPromises = batch.map(async (entry: OctokitTreeItem) => {
+        if (!entry.path || !entry.sha) return null;
+        const fullPath = `${config.eipsFolder}/${entry.path}`;
         try {
-          const { data: fileData } = await octokit.rest.repos.getContent({
+          const { data: fileDataUncasted } = await octokit.rest.repos.getContent({
             owner: config.owner,
             repo: config.repo,
-            path: file.path,
-            ref: config.branch,
+            path: fullPath,
           });
 
-          if ("content" in fileData && fileData.content) {
-            const rawMarkdownContent = Buffer.from(fileData.content, "base64").toString("utf-8");
-            const { metadata: parsedMetadata, mainContent } = parseEipData(rawMarkdownContent, config.protocol);
-            const proposalNumber = extractProposalNumber(file.name, config.proposalPrefix);
+          // Type guard for content
+          const fileData = fileDataUncasted as RestEndpointMethodTypes["repos"]["getContent"]["response"]["data"];
+          if (Array.isArray(fileData) || !("content" in fileData) || !fileData.content) {
+            console.warn(`WARN: [${fullPath}] No content found or unexpected format.`);
+            return null;
+          }
 
-            if (proposalNumber && parsedMetadata.title && parsedMetadata.author && parsedMetadata.status && parsedMetadata.type && parsedMetadata.created) {
-              return {
-                number: proposalNumber,
-                title: parsedMetadata.title,
-                description: parsedMetadata.description,
-                author: parsedMetadata.author,
-                status: parsedMetadata.status,
-                type: parsedMetadata.type,
-                category: parsedMetadata.category,
-                created: parsedMetadata.created,
-                discussionsTo: parsedMetadata.discussionsTo,
-                requires: parsedMetadata.requires,
-                content: mainContent, // Store the main content (after frontmatter)
-                sha: fileData.sha,
-                path: file.path,
-                protocol: config.protocol,
-                lastModified: new Date().toISOString(), // Set current time as last modified
-              } as EipMetadata;
-            } else {
-              console.warn(`WARN: Missing critical metadata for ${file.path}. Title: ${parsedMetadata.title}, Author: ${parsedMetadata.author}, Status: ${parsedMetadata.status}, Type: ${parsedMetadata.type}, Created: ${parsedMetadata.created}`);
-            }
+          const rawMarkdownContent = Buffer.from(fileData.content, "base64").toString("utf-8");
+          const { metadata: parsedMetadata, mainContent, parsingIssues } = parseEipData(rawMarkdownContent, config.protocol, fullPath);
+          const proposalNumber = extractProposalNumber(entry.path.split("/").pop() || "", config.proposalPrefix);
+
+          if (proposalNumber && parsedMetadata.title) {
+            return {
+              number: proposalNumber,
+              title: parsedMetadata.title,
+              description: parsedMetadata.description,
+              author: parsedMetadata.author || "Unknown Author",
+              status: parsedMetadata.status || "Draft",
+              type: parsedMetadata.type || "Unknown Type",
+              category: parsedMetadata.category,
+              created: parsedMetadata.created || new Date(0).toISOString(),
+              discussionsTo: parsedMetadata.discussionsTo,
+              requires: parsedMetadata.requires || [],
+              content: mainContent,
+              sha: entry.sha,
+              path: fullPath,
+              protocol: config.protocol,
+              lastModified: new Date().toISOString(),
+            } as EipMetadata;
+          } else {
+            console.warn(`WARN: [${fullPath}] Skipped due to missing EIP number or title. Number: ${proposalNumber}, Title: ${parsedMetadata.title}. Issues: ${parsingIssues.join(", ")}`);
           }
         } catch (error: any) {
-          console.error(`ERROR: Processing file ${file.path} from ${config.owner}/${config.repo}: ${error.message}`);
+          console.error(`ERROR: [${fullPath}] Processing file from ${config.owner}/${config.repo}: ${error.message}`);
         }
         return null;
       });
 
       const batchResults = await Promise.all(batchPromises);
       proposals.push(...(batchResults.filter(Boolean) as EipMetadata[]));
-
-      if (i + batchSize < proposalFiles.length) {
-        await new Promise((resolve) => setTimeout(resolve, 200)); // Small delay
-      }
     }
 
     console.log(`INFO: Successfully processed ${proposals.length} ${config.proposalPrefix}s from ${config.owner}/${config.repo}`);
     return proposals;
   } catch (error: any) {
     console.error(`ERROR: Fetching ${config.proposalPrefix}s from ${config.owner}/${config.repo}: ${error.message}`);
+    if (error.status === 404) {
+      console.error(`ERROR: Repository or branch not found for ${config.owner}/${config.repo}, branch ${config.branch}. Please check config.`);
+    }
     return [];
   }
 }
@@ -190,37 +278,27 @@ async function cacheProposalsData(protocol: string, proposals: EipMetadata[]): P
 
   console.log(`INFO: Caching ${proposals.length} proposals for protocol: ${protocol}`);
   const pipeline = kv.pipeline();
-
   const listMetadata = [];
   const allStatuses = new Set<string>();
   const allTypes = new Set<string>();
   const allCategories = new Set<string>();
 
   for (const proposal of proposals) {
-    // Cache individual proposal
-    pipeline.set(`eip:${protocol}:${proposal.number}`, proposal); // Using 'eip' prefix for generic proposal key
-
-    // Prepare metadata for list view
+    pipeline.set(`eip:${protocol}:${proposal.number}`, proposal);
     const { content, sha, path, ...listItem } = proposal;
     listMetadata.push(listItem);
-
-    // Collect filter options
     if (proposal.status) allStatuses.add(proposal.status);
     if (proposal.type) allTypes.add(proposal.type);
     if (proposal.category) allCategories.add(proposal.category);
   }
 
-  // Cache the list of metadata items
   pipeline.set(`eips-list:${protocol}`, listMetadata);
-
-  // Cache filter options
   const filterOptions = {
     statuses: Array.from(allStatuses).sort(),
     types: Array.from(allTypes).sort(),
     categories: Array.from(allCategories).sort(),
   };
   pipeline.set(`eips-filters:${protocol}`, filterOptions);
-
   pipeline.set(`eips-last-update:${protocol}`, new Date().toISOString());
 
   try {
@@ -242,7 +320,6 @@ export async function GET(request: NextRequest) {
       console.log(`CRON JOB: Processing repository ${repoConfig.owner}/${repoConfig.repo} for protocol ${repoConfig.protocol}`);
       const proposals = await fetchProposalsFromRepository(repoConfig);
       totalProcessed += proposals.length;
-
       if (proposals.length > 0) {
         await cacheProposalsData(repoConfig.protocol, proposals);
         totalCached += proposals.length;
@@ -265,13 +342,10 @@ export async function GET(request: NextRequest) {
     processingStats,
     timestamp: new Date().toISOString(),
   };
-
   console.log("CRON JOB: Summary:", JSON.stringify(summary, null, 2));
-
   return NextResponse.json(summary);
 }
 
-// Allow manual trigger via POST as well, for easier testing if needed
 export async function POST(request: NextRequest) {
   return GET(request);
 }

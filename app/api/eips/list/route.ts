@@ -1,132 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
+import { kv } from "@vercel/kv";
 import { getProtocolConfig } from "@/lib/subdomain-utils";
 
 // Add dynamic configuration for static export
 export const dynamic = "force-dynamic";
 
+// Interface for the EIP list items (metadata only, content is not needed here)
 interface EipListItem {
   number: string;
   title: string;
-  description: string;
+  description?: string;
   author: string;
   status: string;
   type: string;
   category?: string;
   created: string;
   lastModified?: string;
+  discussionsTo?: string;
+  requires?: string[];
+  protocol: string;
 }
 
-// Mock data for different protocols
-const mockEipsData: Record<string, EipListItem[]> = {
-  ethereum: [
-    {
-      number: "1",
-      title: "EIP Purpose and Guidelines",
-      description: "This EIP provides guidelines and standards for creating EIPs.",
-      author: "Martin Becze, Hudson Jameson",
-      status: "Living",
-      type: "Meta",
-      created: "2015-10-27",
-      lastModified: "2023-02-01",
-    },
-    {
-      number: "20",
-      title: "Token Standard",
-      description: "A standard interface for tokens.",
-      author: "Fabian Vogelsteller, Vitalik Buterin",
-      status: "Final",
-      type: "Standards Track",
-      category: "ERC",
-      created: "2015-11-19",
-      lastModified: "2023-01-15",
-    },
-    {
-      number: "721",
-      title: "Non-Fungible Token Standard",
-      description: "A standard interface for non-fungible tokens.",
-      author: "William Entriken, Dieter Shirley, Jacob Evans, Nastassia Sachs",
-      status: "Final",
-      type: "Standards Track",
-      category: "ERC",
-      created: "2018-01-24",
-      lastModified: "2023-01-10",
-    },
-    {
-      number: "1559",
-      title: "Fee market change for ETH 1.0 chain",
-      description: "A transaction pricing mechanism that includes fixed-per-block network fee.",
-      author: "Vitalik Buterin, Eric Conner, Rick Dudley, Matthew Slipper, Ian Norden, Abdelhamid Bakhta",
-      status: "Final",
-      type: "Standards Track",
-      category: "Core",
-      created: "2019-04-13",
-      lastModified: "2023-01-05",
-    },
-  ],
-  rollup: [
-    {
-      number: "1",
-      title: "RIP Purpose and Guidelines",
-      description: "This RIP provides guidelines and standards for creating RIPs.",
-      author: "Rollup Foundation",
-      status: "Living",
-      type: "Meta",
-      created: "2023-01-01",
-      lastModified: "2023-12-01",
-    },
-    {
-      number: "2",
-      title: "Rollup Interoperability Standard",
-      description: "A standard for cross-rollup communication.",
-      author: "Rollup Team",
-      status: "Draft",
-      type: "Standards Track",
-      category: "Core",
-      created: "2023-06-15",
-      lastModified: "2023-11-15",
-    },
-  ],
-  starknet: [
-    {
-      number: "1",
-      title: "SNIP Purpose and Guidelines",
-      description: "This SNIP provides guidelines and standards for creating SNIPs.",
-      author: "Starknet Foundation",
-      status: "Living",
-      type: "Meta",
-      created: "2022-01-01",
-      lastModified: "2023-12-01",
-    },
-    {
-      number: "2",
-      title: "Cairo Contract Standard",
-      description: "A standard interface for Cairo smart contracts.",
-      author: "Starknet Team",
-      status: "Final",
-      type: "Standards Track",
-      category: "Core",
-      created: "2022-03-15",
-      lastModified: "2023-10-15",
-    },
-  ],
-};
+interface FilterOptions {
+  statuses: string[];
+  types: string[];
+  categories: string[];
+}
 
 export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
     const searchParams = url.searchParams;
 
-    // Parse query parameters
-    const protocol = searchParams.get("protocol") || "ethereum";
+    const protocolKey = searchParams.get("protocol") || "ethereum"; // Default to ethereum if not specified
     const search = searchParams.get("search")?.toLowerCase() || "";
     const status = searchParams.get("status") || "";
     const type = searchParams.get("type") || "";
     const category = searchParams.get("category") || "";
     const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "12");
+    const limit = parseInt(searchParams.get("limit") || "10"); // Default to 10 items per page
 
-    console.log("📋 Fetching EIPs list with filters:", {
-      protocol,
+    console.log("API: [/api/eips/list] - Fetching proposals with filters:", {
+      protocolKey,
       search,
       status,
       type,
@@ -135,18 +50,30 @@ export async function GET(request: NextRequest) {
       limit,
     });
 
-    // Get protocol configuration
-    const protocolConfig = getProtocolConfig(protocol);
+    // Fetch data from Vercel KV
+    const [cachedEips, cachedFilters, lastUpdate] = await Promise.all([kv.get<EipListItem[]>(`eips-list:${protocolKey}`), kv.get<FilterOptions>(`eips-filters:${protocolKey}`), kv.get<string>(`eips-last-update:${protocolKey}`)]);
 
-    // Get mock data for the protocol
-    const mockEips = mockEipsData[protocol] || mockEipsData.ethereum;
+    if (!cachedEips || cachedEips.length === 0) {
+      console.warn(`API: [/api/eips/list] - No cached proposals found for protocol: ${protocolKey}. Cron job might not have run yet.`);
+      return NextResponse.json({
+        success: true,
+        data: {
+          eips: [],
+          protocol: getProtocolConfig(protocolKey),
+          pagination: { currentPage: 1, totalPages: 0, totalCount: 0, limit, hasNextPage: false, hasPrevPage: false },
+          filters: { applied: { search, status, type, category }, options: { statuses: [], types: [], categories: [] } },
+        },
+        message: `No proposals found for ${protocolKey}. Data might still be generating.`,
+        lastUpdate: null,
+        timestamp: new Date().toISOString(),
+      });
+    }
 
-    // In a real implementation, this would fetch from cached data based on protocol
-    let filteredEips = [...mockEips];
+    let filteredEips = [...cachedEips];
 
-    // Apply search filter
+    // Apply search filter (on title, description, number, author)
     if (search) {
-      filteredEips = filteredEips.filter((eip) => eip.title.toLowerCase().includes(search) || eip.description.toLowerCase().includes(search) || eip.number.includes(search) || eip.author.toLowerCase().includes(search));
+      filteredEips = filteredEips.filter((eip) => eip.title.toLowerCase().includes(search) || (eip.description && eip.description.toLowerCase().includes(search)) || eip.number.includes(search) || eip.author.toLowerCase().includes(search));
     }
 
     // Apply status filter
@@ -164,57 +91,48 @@ export async function GET(request: NextRequest) {
       filteredEips = filteredEips.filter((eip) => eip.category === category);
     }
 
-    // Sort by number (descending - newest first)
+    // Sort by number (descending - assuming higher numbers are newer or more relevant by default)
+    // The cron job should ideally sort them if a specific order is desired before caching.
+    // For now, let's sort by number numerically, descending.
     filteredEips.sort((a, b) => parseInt(b.number) - parseInt(a.number));
 
-    // Apply pagination
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-    const paginatedEips = filteredEips.slice(startIndex, endIndex);
-
-    // Calculate metadata
     const totalCount = filteredEips.length;
     const totalPages = Math.ceil(totalCount / limit);
-    const hasNextPage = page < totalPages;
-    const hasPrevPage = page > 1;
+    const startIndex = (page - 1) * limit;
+    const paginatedEips = filteredEips.slice(startIndex, startIndex + limit);
 
-    // Generate filter options from all EIPs (not just filtered ones)
-    const filterOptions = {
-      statuses: [...new Set(mockEips.map((eip) => eip.status))].sort(),
-      types: [...new Set(mockEips.map((eip) => eip.type))].sort(),
-      categories: [...new Set(mockEips.map((eip) => eip.category).filter(Boolean))].sort(),
-    };
-
-    console.log(`✅ Returning ${paginatedEips.length} ${protocolConfig.proposalPrefix}s (page ${page}/${totalPages})`);
+    console.log(`API: [/api/eips/list] - Returning ${paginatedEips.length} proposals for ${protocolKey} (page ${page}/${totalPages})`);
 
     return NextResponse.json({
       success: true,
       data: {
         eips: paginatedEips,
-        protocol: protocolConfig,
+        protocol: getProtocolConfig(protocolKey),
         pagination: {
           currentPage: page,
           totalPages,
           totalCount,
           limit,
-          hasNextPage,
-          hasPrevPage,
+          hasNextPage: page < totalPages,
+          hasPrevPage: page > 1,
         },
         filters: {
           applied: { search, status, type, category },
-          options: filterOptions,
+          options: cachedFilters || { statuses: [], types: [], categories: [] }, // Use cached filters
         },
       },
+      lastUpdate: lastUpdate || null,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("❌ Error fetching EIPs list:", error);
-
+    console.error("API: [/api/eips/list] - Error fetching proposals:", error);
+    const protocolKey = new URL(request.url).searchParams.get("protocol") || "ethereum";
     return NextResponse.json(
       {
         success: false,
-        error: "Failed to fetch EIPs list",
+        error: "Failed to fetch proposals list",
         details: error instanceof Error ? error.message : String(error),
+        protocol: getProtocolConfig(protocolKey),
         timestamp: new Date().toISOString(),
       },
       { status: 500 }
@@ -222,11 +140,11 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Health check endpoint
+// Optional: POST handler for health check or alternative triggering if needed
 export async function POST(request: NextRequest) {
+  const protocolKey = new URL(request.url).searchParams.get("protocol") || "default";
   return NextResponse.json({
-    message: "EIPs list API endpoint is healthy",
+    message: `EIPs list API endpoint is healthy for protocol: ${protocolKey}`,
     timestamp: new Date().toISOString(),
-    mockDataCount: mockEipsData.ethereum.length,
   });
 }
