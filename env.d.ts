@@ -1,0 +1,31 @@
+declare namespace NodeJS {
+  interface ProcessEnv {
+    DATABASE_URL: string;
+    STRIPE_SECRET_KEY: string;
+    NEXT_PUBLIC_PRIVY_APP_ID: string;
+    NEXT_PUBLIC_BASE_URL: string;
+    PRIVY_APP_SECRET: string;
+
+    // GitHub App Configuration
+    GITHUB_APP_ID?: string;
+    GITHUB_APP_PRIVATE_KEY?: string;
+    NEXT_PUBLIC_GITHUB_APP_NAME?: string;
+    GITHUB_WEBHOOK_SECRET?: string;
+
+    // Repository Configuration
+    NEXT_PUBLIC_ETHEREUM_REPO_OWNER?: string;
+    NEXT_PUBLIC_ETHEREUM_REPO_NAME?: string;
+    NEXT_PUBLIC_ETHEREUM_REPO_BRANCH?: string;
+    NEXT_PUBLIC_ETHEREUM_REPO_DESCRIPTION?: string;
+
+    NEXT_PUBLIC_ARBITRUM_REPO_OWNER?: string;
+    NEXT_PUBLIC_ARBITRUM_REPO_NAME?: string;
+    NEXT_PUBLIC_ARBITRUM_REPO_BRANCH?: string;
+    NEXT_PUBLIC_ARBITRUM_REPO_DESCRIPTION?: string;
+
+    NEXT_PUBLIC_POLYGON_REPO_OWNER?: string;
+    NEXT_PUBLIC_POLYGON_REPO_NAME?: string;
+    NEXT_PUBLIC_POLYGON_REPO_BRANCH?: string;
+    NEXT_PUBLIC_POLYGON_REPO_DESCRIPTION?: string;
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "regions": ["iad1"],
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "build": {
+    "env": {
+      "NODE_ENV": "production"
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/agent",
+      "schedule": "0 0,12 * * *"
+    },
+    {
+      "path": "/api/cron/generate-static",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}

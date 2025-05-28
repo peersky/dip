@@ -1,0 +1,42 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                      String    @id @default(uuid())
+  walletAddress           String    @unique
+  isOnboarded             Boolean   @default(false)
+
+  // Political stance questionnaire data
+  economicPosition        Float?    // -1 (left) to 1 (right)
+  socialPosition          Float?    // -1 (progressive) to 1 (conservative)
+  authPosition            Float?    // -1 (libertarian) to 1 (authoritarian)
+  globalPosition          Float?    // -1 (globalist) to 1 (nationalist)
+  envPosition             Float?    // -1 (ecological) to 1 (industrial)
+  stanceDescription       String?   @db.VarChar(10000)
+  priorityCategories      String[]  // Array of category values
+
+  // Additional comments for each section
+  economicSocialComment   String?   @db.VarChar(1500)
+  authorityGlobalComment  String?   @db.VarChar(1500)
+  environmentalComment    String?   @db.VarChar(1500)
+
+  // AI usage tracking
+  aiGenerationCount       Int       @default(0)
+  citizenship             String?   @db.VarChar(255)
+
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+}

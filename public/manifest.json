@@ -1,0 +1,8 @@
+{
+    "name": "Peeramid Labs solutions",
+    "short_name": "Peeramid Labs solutions",
+    "display": "browser",
+    "orientation": "landscape",
+    "scope": "/",
+    "start_url": "/"
+}
