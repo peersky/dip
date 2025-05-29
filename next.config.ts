@@ -45,6 +45,10 @@ export default {
     config.resolve.alias = {
       ...config.resolve.alias,
       "@": ".",
+      "@/components": "./components",
+      "@/lib": "./lib",
+      "@/app": "./app",
+      "@/hooks": "./hooks",
     };
 
     // Fixes npm packages that depend on `fs` module
