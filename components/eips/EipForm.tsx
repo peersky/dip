@@ -156,6 +156,17 @@ export interface EipFormSubmitData extends Omit<EipFormValues, 'mainContent' | '
   copyright: string;
 }
 
+interface SubmissionData {
+  rawSubmitData: EipFormSubmitData;
+  fullMarkdown: string;
+  filename: string;
+  githubInstallationId?: string | null;
+  githubUser?: {
+    login: string;
+  };
+  userToken?: string | null;
+}
+
 const defaultMainContent = `## Abstract
 
 [Provide a short (~200 word) description of the technical issue being addressed.]
@@ -462,13 +473,17 @@ export default function EipForm({ onSubmit, initialData, isEditing = false, eipN
       const fullMarkdown = formatEipForSubmit(output);
       const filename = generateEipFilename(output.title, output.eip, output.status);
 
+      // Get user token from localStorage
+      const userToken = localStorage.getItem('github_token');
+
       // Include GitHub token in submission data
-      const submissionData = {
+      const submissionData: SubmissionData = {
         rawSubmitData: output,
         fullMarkdown,
         filename,
         githubInstallationId,
-        githubUser
+        githubUser,
+        userToken
       };
 
       await onSubmit(submissionData);
@@ -657,20 +672,20 @@ export default function EipForm({ onSubmit, initialData, isEditing = false, eipN
                 type="submit"
                 mt="md"
                 loading={isSubmitting}
-                disabled={!githubInstallationId}
+                disabled={!githubInstallationId || !localStorage.getItem('github_token')}
                 leftSection={!isSubmitting ? <IconGitPullRequest size="1rem" /> : undefined}
               >
                 {isSubmitting
                   ? "Creating Pull Request..."
-                  : githubInstallationId
+                  : (githubInstallationId && localStorage.getItem('github_token'))
                     ? (isEditing ? "Update EIP (Submit PR)" : "Create EIP (Submit PR)")
-                    : "Connect GitHub to Submit"
+                    : "Complete GitHub Setup to Submit"
                 }
               </Button>
 
-              {!githubInstallationId && (
+              {(!githubInstallationId || !localStorage.getItem('github_token')) && (
                 <Text size="xs" c="dimmed" ta="center">
-                  GitHub authentication is required to submit EIPs automatically
+                  Both GitHub App installation and authentication are required to submit EIPs automatically
                 </Text>
               )}
             </Stack>

@@ -14,10 +14,11 @@ interface SubmissionParams {
   githubUser?: {
     login: string;
   };
+  userToken?: string;
 }
 
 export async function POST(request: Request) {
-  const { filename, content, title, eipNumber, installationId, githubUser, targetRepository } = await request.json();
+  const { filename, content, title, eipNumber, installationId, githubUser, targetRepository, userToken } = await request.json();
 
   console.log("🔍 EIP submission request:", {
     filename,
@@ -26,6 +27,7 @@ export async function POST(request: Request) {
     installationId,
     githubUser: githubUser?.login,
     targetRepository,
+    hasUserToken: !!userToken,
     nodeEnv: process.env.NODE_ENV,
     hasGitHubAppId: !!process.env.GITHUB_APP_ID,
     hasGitHubPrivateKey: !!process.env.GITHUB_APP_PRIVATE_KEY,
@@ -41,48 +43,55 @@ export async function POST(request: Request) {
   console.log("🎯 Target repository:", target);
 
   // If user has GitHub App installed, use app-based approach
-  if (installationId) {
-    console.log("📱 Using app-based submission with installation ID:", installationId);
-    return handleAppBasedSubmission({ filename, content, title, eipNumber, installationId, githubUser, targetRepository: target });
+  if (installationId && userToken) {
+    console.log("📱 Using hybrid submission with installation ID and user token");
+    return handleHybridSubmission({ filename, content, title, eipNumber, installationId, githubUser, targetRepository: target, userToken });
   }
 
   // Otherwise, provide manual submission instructions
-  console.log("📝 Using manual submission (no installation ID)");
+  console.log("📝 Using manual submission (missing installation ID or user token)");
   return handleManualSubmission({ filename, content, title, eipNumber, targetRepository: target });
 }
 
-async function handleAppBasedSubmission({ filename, content, title, eipNumber, installationId, githubUser, targetRepository }: SubmissionParams) {
+async function handleHybridSubmission({ filename, content, title, eipNumber, installationId, githubUser, targetRepository, userToken }: SubmissionParams) {
   try {
     const appId = process.env.GITHUB_APP_ID;
     const privateKey = process.env.GITHUB_APP_PRIVATE_KEY;
 
-    console.log("🚀 Attempting real GitHub App submission");
+    console.log("🚀 Attempting hybrid GitHub submission (app + user token)");
     console.log("📋 App ID present:", !!appId);
     console.log("🔑 Private key present:", !!privateKey);
     console.log("🆔 Installation ID:", installationId);
+    console.log("👤 User token present:", !!userToken);
 
     if (!appId || !privateKey) {
       console.log("❌ Missing GitHub App credentials, falling back to manual submission");
       return handleManualSubmission({ filename, content, title, eipNumber, targetRepository });
     }
 
-    if (!installationId) {
-      console.log("❌ No installation ID provided, falling back to manual submission");
+    if (!installationId || !userToken) {
+      console.log("❌ Missing installation ID or user token, falling back to manual submission");
       return handleManualSubmission({ filename, content, title, eipNumber, targetRepository });
     }
 
-    // Create GitHub App instance
+    // Create GitHub App instance for fork operations
     const app = new App({
       appId: appId,
       privateKey: privateKey.replace(/\\n/g, "\n"),
     });
 
-    // Get installation octokit
-    const octokit = await app.getInstallationOctokit(parseInt(installationId));
+    // Create user OAuth client for PR operations
+    const { Octokit } = await import("octokit");
+    const userOctokit = new Octokit({
+      auth: userToken,
+    });
 
-    // Get installation details first
+    // Get installation octokit for fork operations
+    const appOctokit = await app.getInstallationOctokit(parseInt(installationId!));
+
+    // Get installation details
     const { data: installation } = await app.octokit.rest.apps.getInstallation({
-      installation_id: parseInt(installationId),
+      installation_id: parseInt(installationId!),
     });
 
     if (!installation.account) {
@@ -95,39 +104,9 @@ async function handleAppBasedSubmission({ filename, content, title, eipNumber, i
     }
 
     const username = githubUser.login;
-    const installationAccount = "login" in installation.account ? installation.account.login : installation.account.slug;
+    console.log(`👤 Using user: ${username}`);
 
-    // We need to find the user's personal installation to access their fork
-    // The current installationId might be for the organization
-    let userInstallationId = installationId;
-
-    // Get all installations to find the user's personal one
-    try {
-      const { data: installations } = await app.octokit.rest.apps.listInstallations();
-      console.log(`🔍 Found ${installations.length} installations`);
-
-      // Find the user's personal installation
-      const userInstallation = installations.find((inst) => inst.account && "login" in inst.account && inst.account.login === username);
-
-      if (userInstallation) {
-        userInstallationId = userInstallation.id.toString();
-        console.log(`👤 Found user installation: ${userInstallationId} for ${username}`);
-      } else {
-        console.log(`⚠️ No personal installation found for ${username}, using provided installation`);
-      }
-    } catch (error) {
-      console.log(`⚠️ Could not list installations, using provided installation: ${error}`);
-    }
-
-    // Use the user's installation for fork operations
-    const userOctokit = await app.getInstallationOctokit(parseInt(userInstallationId));
-
-    console.log(`👤 Using provided user: ${username}`);
-    console.log(`🏢 App installed on: ${installationAccount}`);
-    console.log(`📋 Installation target type: ${installation.target_type}`);
-    console.log(`🔧 Using installation ${userInstallationId} for fork operations`);
-
-    // 1. Check if user has a fork of the target repository
+    // 1. Check if user has a fork of the target repository (using user token)
     let userFork;
     try {
       console.log(`🔍 Checking if ${username} has a fork of ${targetRepository!.owner}/${targetRepository!.repo}`);
@@ -139,7 +118,7 @@ async function handleAppBasedSubmission({ filename, content, title, eipNumber, i
       console.log(`✅ Found existing fork: ${username}/${targetRepository!.repo}`);
     } catch (error: any) {
       if (error.status === 404) {
-        // Fork doesn't exist, create it
+        // Fork doesn't exist, create it using user token
         console.log(`🍴 Fork not found. Creating fork of ${targetRepository!.owner}/${targetRepository!.repo} for ${username}`);
         try {
           const { data: fork } = await userOctokit.rest.repos.createFork({
@@ -162,7 +141,7 @@ async function handleAppBasedSubmission({ filename, content, title, eipNumber, i
       }
     }
 
-    // 2. Create a new branch for this EIP in the user's fork
+    // 2. Create a new branch for this EIP in the user's fork (using user token)
     const branchName = `eip-${eipNumber || "draft"}-${Date.now()}`;
     console.log(`🌿 Creating branch: ${branchName} in ${username}/${targetRepository!.repo}`);
 
@@ -181,7 +160,7 @@ async function handleAppBasedSubmission({ filename, content, title, eipNumber, i
       sha: defaultBranch.commit.sha,
     });
 
-    // 3. Create/update the EIP file in the new branch of user's fork
+    // 3. Create/update the EIP file in the new branch of user's fork (using user token)
     const folderName = targetRepository!.repo === "EIPs" ? "EIPS" : targetRepository!.repo.toUpperCase();
     console.log(`📝 Creating EIP file: ${folderName}/${filename} in ${username}/${targetRepository!.repo}:${branchName}`);
 
@@ -194,24 +173,26 @@ async function handleAppBasedSubmission({ filename, content, title, eipNumber, i
       branch: branchName,
     });
 
-    // 4. Create pull request from user's fork to the target repository
+    // 4. Create pull request from user's fork to the target repository (using user token)
     // First, get the target repository's default branch
     const { data: targetRepo } = await userOctokit.rest.repos.get({
       owner: targetRepository!.owner,
       repo: targetRepository!.repo,
     });
 
-    console.log(`🔄 Creating PR from ${username}:${branchName} to ${targetRepository!.owner}:${targetRepo.default_branch}`);
+    console.log(`🔄 Creating PR from ${username}:${branchName} to ${targetRepository!.owner}:${targetRepo.default_branch} using user token`);
 
     const { data: pullRequest } = await userOctokit.rest.pulls.create({
       owner: targetRepository!.owner,
       repo: targetRepository!.repo,
       title: title,
       head: `${username}:${branchName}`,
-      base: targetRepo.default_branch, // Use target repository's default branch
+      base: targetRepo.default_branch,
       body: `This pull request adds ${title}.\n\nSubmitted via DIP Platform.\n\n**Author:** ${username}\n**EIP Number:** ${eipNumber || "Draft"}\n**Submission Date:** ${new Date().toISOString().split("T")[0]}`,
       maintainer_can_modify: true,
     });
+
+    console.log(`✅ PR created successfully: #${pullRequest.number} - ${pullRequest.html_url}`);
 
     return NextResponse.json({
       success: true,
@@ -223,10 +204,10 @@ async function handleAppBasedSubmission({ filename, content, title, eipNumber, i
       message: "Pull request created successfully!",
     });
   } catch (error: any) {
-    console.error("GitHub App submission error:", error);
+    console.error("Hybrid GitHub submission error:", error);
     console.error(JSON.stringify(error, null, 2));
 
-    // If GitHub App submission fails, fall back to manual instructions
+    // If submission fails, fall back to manual instructions
     return handleManualSubmission({ filename, content, title, eipNumber, targetRepository });
   }
 }

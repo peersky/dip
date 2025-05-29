@@ -19,6 +19,7 @@ interface SubmissionData {
   githubUser?: {
     login: string;
   };
+  userToken?: string;
 }
 
 export default function SubdomainNewEipPage() {
@@ -43,10 +44,10 @@ export default function SubdomainNewEipPage() {
   const createPRMutation = useCreatePR();
 
   const handleSubmit = async (data: SubmissionData) => {
-    if (!data.githubInstallationId || !data.githubUser) {
+    if (!data.githubInstallationId || !data.githubUser || !data.userToken) {
       notifications.show({
         title: "GitHub Authentication Required",
-        message: "Please connect your GitHub account to submit EIPs automatically.",
+        message: "Please ensure you are both authenticated with GitHub and have installed the GitHub App.",
         color: 'orange',
         autoClose: 5000,
       });
@@ -69,6 +70,7 @@ export default function SubdomainNewEipPage() {
         filename: data.filename,
         eipNumber: data.rawSubmitData.eip,
         installationId: data.githubInstallationId,
+        userToken: data.userToken,
         githubUser: data.githubUser,
         targetRepository: {
           owner: repositoryInfo.owner,

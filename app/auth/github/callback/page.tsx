@@ -90,15 +90,15 @@ function GitHubCallbackContent() {
 
             // Not a popup, redirect appropriately
             if (returnDomain && returnDomain !== window.location.hostname) {
-              // Redirect back to original subdomain
-              setTimeout(() => {
-                window.location.href = `https://${returnDomain}`;
-              }, 2000);
-            } else {
-              // Fallback: redirect to home
-              setTimeout(() => {
-                window.location.href = '/';
-              }, 2000);
+            // Redirect back to original subdomain
+            setTimeout(() => {
+              window.location.href = `https://${returnDomain}`;
+            }, 2000);
+          } else {
+            // Fallback: redirect to home
+            setTimeout(() => {
+              window.location.href = '/';
+            }, 2000);
             }
           }
         } else {

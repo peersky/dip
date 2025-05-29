@@ -72,6 +72,7 @@ interface CreatePRParams {
   filename: string;
   eipNumber?: string;
   installationId?: string;
+  userToken?: string;
   githubUser?: {
     login: string;
   };
@@ -121,6 +122,7 @@ const createPR = async (params: CreatePRParams) => {
       title: params.title,
       eipNumber: params.eipNumber,
       installationId: params.installationId,
+      userToken: params.userToken,
       githubUser: params.githubUser,
       targetRepository: params.targetRepository,
     }),
