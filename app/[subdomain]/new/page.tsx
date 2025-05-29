@@ -3,12 +3,13 @@
 import { Container, Title, Stack, Alert, Group, Button, Text } from "@mantine/core";
 import EipForm, { EipFormSubmitData } from "@/components/eips/EipForm";
 import { notifications } from "@mantine/notifications";
-import { useState } from "react";
-import { IconCheck, IconX, IconGitPullRequest, IconExternalLink } from "@tabler/icons-react";
-import { useTenant } from "@/hooks/useTenant";
+import { useState, useMemo } from "react";
+import { IconCheck, IconGitPullRequest, IconExternalLink } from "@tabler/icons-react";
+import { getProtocolConfig } from "@/lib/subdomain-utils";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { ErrorDisplay } from "@/components/shared/ErrorDisplay";
 import { useCreatePR } from "@/hooks/useEips";
+import { useParams, useRouter } from "next/navigation";
 
 interface SubmissionData {
   rawSubmitData: EipFormSubmitData;
@@ -18,12 +19,25 @@ interface SubmissionData {
   githubUser?: any;
 }
 
-export default function NewEipPage() {
+export default function SubdomainNewEipPage() {
+  const router = useRouter();
+  const params = useParams();
+  const subdomain = params.subdomain as string;
+
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [successData, setSuccessData] = useState<{ url: string; number: number } | null>(null);
-  const { repositoryInfo, protocolConfig, isLoading } = useTenant();
 
-  // Use React Query mutation for PR creation
+  const protocolConfig = useMemo(() => getProtocolConfig(subdomain), [subdomain]);
+  const repositoryInfo = useMemo(() => {
+    const config = getProtocolConfig(subdomain);
+    return {
+      owner: config.repoOwner,
+      repo: config.repoName,
+      fullName: `${config.repoOwner}/${config.repoName}`,
+      displayName: config.description,
+    };
+  }, [subdomain]);
+
   const createPRMutation = useCreatePR();
 
   const handleSubmit = async (data: SubmissionData) => {
@@ -49,8 +63,7 @@ export default function NewEipPage() {
         type: data.rawSubmitData.type,
         category: data.rawSubmitData.category,
         status: data.rawSubmitData.status,
-        protocol: protocolConfig.subdomain,
-        // Additional data for PR creation
+        protocol: subdomain,
         filename: data.filename,
         eipNumber: data.rawSubmitData.eip,
         installationId: data.githubInstallationId,
@@ -62,15 +75,13 @@ export default function NewEipPage() {
       });
 
       if (result.success) {
-        // Successful GitHub PR creation
         setSuccessData({
           url: result.pullRequest.url,
           number: result.pullRequest.number
         });
-
         notifications.show({
           title: "Pull Request Created!",
-          message: `Successfully created PR #${result.pullRequest.number}`,
+          message: `Successfully created PR #${result.pullRequest.number} for ${protocolConfig.name}`,
           color: 'green',
           autoClose: 10000,
         });
@@ -80,7 +91,6 @@ export default function NewEipPage() {
     } catch (error: any) {
       console.error("Failed to submit EIP for PR creation:", error);
       setSubmissionError(error.message || "Could not connect to the server to create PR.");
-
       notifications.show({
         title: "Submission Failed",
         message: error.message || "An error occurred while creating the pull request.",
@@ -93,13 +103,13 @@ export default function NewEipPage() {
   const handleRetry = () => {
     setSubmissionError(null);
     setSuccessData(null);
-    createPRMutation.reset(); // Reset mutation state
+    createPRMutation.reset();
   };
 
-  if (isLoading) {
+  if (!protocolConfig || protocolConfig.subdomain === 'main') {
     return (
       <Container size="lg" py="xl">
-        <LoadingSpinner message="Loading repository configuration..." />
+        <ErrorDisplay title="Invalid Protocol" message={`The protocol "${subdomain}" is not recognized for creating a new proposal.`} variant="page" />
       </Container>
     );
   }
@@ -108,18 +118,17 @@ export default function NewEipPage() {
     <Container size="lg" py="xl">
       <Stack gap="xl">
         <div>
-          <Title order={1}>Create New {protocolConfig.name}</Title>
+          <Title order={1}>Create New {protocolConfig.name} {protocolConfig.proposalPrefix}</Title>
           <Text c="dimmed" mt="xs">
             Submit to {repositoryInfo.displayName} ({repositoryInfo.fullName})
           </Text>
         </div>
 
-        {/* Success State */}
         {successData && (
-          <Alert icon={<IconCheck size="1rem" />} title="EIP Submitted Successfully!" color="green">
+          <Alert icon={<IconCheck size="1rem" />} title={`${protocolConfig.proposalPrefix} Submitted Successfully!`} color="green">
             <Stack gap="md">
               <Text size="sm">
-                Your EIP has been submitted as Pull Request #{successData.number} and is now under review.
+                Your {protocolConfig.proposalPrefix} has been submitted as Pull Request #{successData.number} and is now under review.
               </Text>
               <Group>
                 <Button
@@ -134,14 +143,19 @@ export default function NewEipPage() {
                   variant="outline"
                   onClick={handleRetry}
                 >
-                  Submit Another EIP
+                  Submit Another {protocolConfig.proposalPrefix}
+                </Button>
+                <Button
+                  variant="subtle"
+                  onClick={() => router.push(`/${subdomain}`)}
+                >
+                  Back to {protocolConfig.name} list
                 </Button>
               </Group>
             </Stack>
           </Alert>
         )}
 
-        {/* Error State */}
         {submissionError && (
           <ErrorDisplay
             title="Submission Failed"
@@ -150,18 +164,18 @@ export default function NewEipPage() {
           />
         )}
 
-        {/* Form - hidden when successful */}
         {!successData && (
           <div style={{ position: 'relative' }}>
             {createPRMutation.isPending && (
               <LoadingSpinner
                 variant="overlay"
-                message="Creating pull request..."
+                message={`Creating pull request for ${protocolConfig.name}...`}
               />
             )}
             <EipForm
               onSubmit={handleSubmit}
               isEditing={false}
+              protocolConfig={protocolConfig}
             />
           </div>
         )}

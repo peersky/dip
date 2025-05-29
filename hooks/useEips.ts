@@ -1,65 +1,60 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 // Types
-interface EipItem {
+export interface EipItem {
   number: string;
   title: string;
-  description: string;
+  description?: string;
   author: string;
   status: string;
   type: string;
   category?: string;
   created: string;
   lastModified?: string;
+  wordCount?: number;
+  sections?: string[];
+  fileSize?: number;
+  authorEmails?: string[];
+  authorGithubHandles?: string[];
 }
 
 interface EipListResponse {
   success: boolean;
-  data: {
-    eips: EipItem[];
-    protocol: {
-      name: string;
-      repoOwner: string;
-      repoName: string;
-      defaultBranch: string;
-      proposalPrefix: string;
-      description: string;
-      color: string;
-      subdomain: string;
-    };
-    pagination: {
-      currentPage: number;
-      totalPages: number;
-      totalCount: number;
-      limit: number;
-      hasNextPage: boolean;
-      hasPrevPage: boolean;
-    };
-    filters: {
-      applied: {
-        search: string;
-        status: string;
-        type: string;
-        category: string;
-      };
-      options: {
-        statuses: string[];
-        types: string[];
-        categories: string[];
-      };
-    };
+  data: EipItem[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
   };
-  timestamp: string;
+  filters: {
+    statuses: string[];
+    types: string[];
+    categories: string[];
+    authors?: string[];
+    sections?: string[];
+  };
+  statistics?: {
+    totalProposals: number;
+    totalWordCount: number;
+    averageWordCount: number;
+    statusCounts: Record<string, number>;
+    typeCounts: Record<string, number>;
+    yearCounts: Record<string, number>;
+    lastUpdated: string;
+  };
+  lastUpdate?: string;
+  protocol: string;
+  error?: string;
 }
 
-interface EipListParams {
+export interface EipListParams {
   protocol: string;
   page?: number;
   limit?: number;
   search?: string;
   status?: string;
-  type?: string;
-  category?: string;
+  track?: string;
 }
 
 interface CreatePRParams {
@@ -96,8 +91,7 @@ const fetchEipsList = async (params: EipListParams): Promise<EipListResponse> =>
 
   if (params.search) searchParams.append("search", params.search);
   if (params.status) searchParams.append("status", params.status);
-  if (params.type) searchParams.append("type", params.type);
-  if (params.category) searchParams.append("category", params.category);
+  if (params.track) searchParams.append("track", params.track);
 
   const response = await fetch(`/api/eips/list?${searchParams}`);
 

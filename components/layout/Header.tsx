@@ -25,7 +25,7 @@ export const Header: React.FC<HeaderProps> = ({ opened, toggle }) => {
     <Group h="100%" px="md">
       <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
       <Title order={3}>
-        {protocolConfig.name} DIP Platform
+        {protocolConfig.name} Improvements
       </Title>
     </Group>
   );

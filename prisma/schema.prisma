@@ -40,3 +40,79 @@ model User {
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
 }
+
+// EIP Data Storage Models
+model Repository {
+  id              String    @id @default(uuid())
+  owner           String
+  repo            String
+  branch          String
+  eipsFolder      String
+  protocol        String
+  proposalPrefix  String
+  enabled         Boolean   @default(true)
+  description     String?
+  website         String?
+
+  // Relationships
+  rawFiles        RawFile[]
+  crawlRuns       CrawlRun[]
+
+  // Metadata
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([owner, repo, protocol])
+  @@index([protocol])
+}
+
+model CrawlRun {
+  id                String    @id @default(uuid())
+  repositoryId      String
+  repository        Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  // Crawl metadata
+  startedAt         DateTime  @default(now())
+  completedAt       DateTime?
+  status            String    @default("running") // running, completed, failed
+  totalFilesFound   Int?
+  totalProcessed    Int       @default(0)
+  totalErrors       Int       @default(0)
+  errorDetails      Json?     // Store any error information
+
+  // GitHub API usage
+  apiCallsUsed      Int       @default(0)
+  rateLimitHit      Boolean   @default(false)
+
+  // Relationships
+  rawFiles          RawFile[]
+
+  @@index([repositoryId, startedAt])
+}
+
+model RawFile {
+  id                String    @id @default(uuid())
+
+  // Repository info
+  repositoryId      String
+  repository        Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  crawlRunId        String?
+  crawlRun          CrawlRun? @relation(fields: [crawlRunId], references: [id], onDelete: SetNull)
+
+  // File metadata from GitHub
+  githubPath        String    // Full path in repository
+  githubSha         String    // Git SHA for tracking changes
+  fileSize          Int?      // File size in bytes
+  lastCommitDate    DateTime?
+
+  // Raw content - no processing at all
+  rawMarkdown       String    @db.Text // Full raw markdown content as-is
+
+  // Timestamps
+  crawledAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([repositoryId, githubPath]) // One record per file path per repository
+  @@index([repositoryId])
+  @@index([crawledAt])
+}

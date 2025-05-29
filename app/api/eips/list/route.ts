@@ -29,111 +29,133 @@ interface FilterOptions {
 
 export async function GET(request: NextRequest) {
   try {
-    const url = new URL(request.url);
-    const searchParams = url.searchParams;
+    const { searchParams } = new URL(request.url);
+    const protocol = searchParams.get("protocol");
 
-    const protocolKey = searchParams.get("protocol") || "ethereum"; // Default to ethereum if not specified
-    const search = searchParams.get("search")?.toLowerCase() || "";
-    const status = searchParams.get("status") || "";
-    const type = searchParams.get("type") || "";
-    const category = searchParams.get("category") || "";
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "10"); // Default to 10 items per page
-
-    console.log("API: [/api/eips/list] - Fetching proposals with filters:", {
-      protocolKey,
-      search,
-      status,
-      type,
-      category,
-      page,
-      limit,
-    });
-
-    // Fetch data from Vercel KV
-    const [cachedEips, cachedFilters, lastUpdate] = await Promise.all([kv.get<EipListItem[]>(`eips-list:${protocolKey}`), kv.get<FilterOptions>(`eips-filters:${protocolKey}`), kv.get<string>(`eips-last-update:${protocolKey}`)]);
-
-    if (!cachedEips || cachedEips.length === 0) {
-      console.warn(`API: [/api/eips/list] - No cached proposals found for protocol: ${protocolKey}. Cron job might not have run yet.`);
-      return NextResponse.json({
-        success: true,
-        data: {
-          eips: [],
-          protocol: getProtocolConfig(protocolKey),
-          pagination: { currentPage: 1, totalPages: 0, totalCount: 0, limit, hasNextPage: false, hasPrevPage: false },
-          filters: { applied: { search, status, type, category }, options: { statuses: [], types: [], categories: [] } },
+    if (!protocol) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Protocol parameter is required",
+          data: [],
+          pagination: {
+            total: 0,
+            page: 1,
+            limit: 20,
+            totalPages: 0,
+          },
+          filters: {
+            statuses: [],
+            types: [],
+            categories: [],
+          },
+          statistics: null,
+          lastUpdate: null,
         },
-        message: `No proposals found for ${protocolKey}. Data might still be generating.`,
+        { status: 400 }
+      );
+    }
+
+    const status = searchParams.get("status");
+    const track = searchParams.get("track");
+    const search = searchParams.get("search");
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "20");
+
+    console.log(`Fetching EIPs for protocol: ${protocol}`);
+    console.log(`Request URL: ${request.url}`);
+    console.log(`Params:`, { protocol, status, track, search, page, limit });
+
+    // Fetch cached data from KV
+    const [eipsList, filtersData, statsData, lastUpdate] = await Promise.all([kv.get(`eips-list:${protocol}`), kv.get(`eips-filters:${protocol}`), kv.get(`eips-stats:${protocol}`), kv.get(`eips-last-update:${protocol}`)]);
+
+    console.log(`Cache check for protocol ${protocol}:`);
+    console.log(`- eips-list:${protocol} found:`, !!eipsList, Array.isArray(eipsList) ? eipsList.length : "not array");
+    console.log(`- eips-filters:${protocol} found:`, !!filtersData);
+    console.log(`- eips-stats:${protocol} found:`, !!statsData);
+    console.log(`- eips-last-update:${protocol} found:`, !!lastUpdate);
+
+    if (!eipsList || !Array.isArray(eipsList)) {
+      console.log(`No cached data found for protocol: ${protocol}`);
+
+      // Let's also check what keys exist in KV for debugging
+      console.log("Checking available KV keys...");
+      try {
+        // Try to get all available keys (this may not work in all KV implementations)
+        const allKeys = await kv.keys("eips-list:*");
+        console.log("Available eips-list keys:", allKeys);
+      } catch (error) {
+        console.log("Could not fetch all keys:", error);
+      }
+
+      return NextResponse.json({
+        success: false,
+        error: "No data available for this protocol. Run the static generation cron job first.",
+        data: [],
+        pagination: {
+          total: 0,
+          page: 1,
+          limit: limit,
+          totalPages: 0,
+        },
+        filters: {
+          statuses: [],
+          types: [],
+          categories: [],
+        },
+        statistics: null,
         lastUpdate: null,
-        timestamp: new Date().toISOString(),
       });
     }
 
-    let filteredEips = [...cachedEips];
+    let filteredEips = [...eipsList];
 
-    // Apply search filter (on title, description, number, author)
-    if (search) {
-      filteredEips = filteredEips.filter((eip) => eip.title.toLowerCase().includes(search) || (eip.description && eip.description.toLowerCase().includes(search)) || eip.number.includes(search) || eip.author.toLowerCase().includes(search));
-    }
-
-    // Apply status filter
+    // Apply filters
     if (status) {
       filteredEips = filteredEips.filter((eip) => eip.status === status);
     }
-
-    // Apply type filter
-    if (type) {
-      filteredEips = filteredEips.filter((eip) => eip.type === type);
+    if (track) {
+      filteredEips = filteredEips.filter((eip) => eip.type === track || eip.category === track);
     }
 
-    // Apply category filter
-    if (category) {
-      filteredEips = filteredEips.filter((eip) => eip.category === category);
+    // Apply search
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filteredEips = filteredEips.filter((eip) => eip.title.toLowerCase().includes(searchLower) || eip.description?.toLowerCase().includes(searchLower) || eip.author.toLowerCase().includes(searchLower) || eip.number.includes(search));
     }
 
-    // Sort by number (descending - assuming higher numbers are newer or more relevant by default)
-    // The cron job should ideally sort them if a specific order is desired before caching.
-    // For now, let's sort by number numerically, descending.
+    // Sort by EIP number (descending)
     filteredEips.sort((a, b) => parseInt(b.number) - parseInt(a.number));
 
-    const totalCount = filteredEips.length;
-    const totalPages = Math.ceil(totalCount / limit);
-    const startIndex = (page - 1) * limit;
-    const paginatedEips = filteredEips.slice(startIndex, startIndex + limit);
+    // Pagination
+    const total = filteredEips.length;
+    const totalPages = Math.ceil(total / limit);
+    const offset = (page - 1) * limit;
+    const paginatedEips = filteredEips.slice(offset, offset + limit);
 
-    console.log(`API: [/api/eips/list] - Returning ${paginatedEips.length} proposals for ${protocolKey} (page ${page}/${totalPages})`);
+    console.log(`Returning ${paginatedEips.length} EIPs (${total} total) for protocol: ${protocol}`);
 
     return NextResponse.json({
       success: true,
-      data: {
-        eips: paginatedEips,
-        protocol: getProtocolConfig(protocolKey),
-        pagination: {
-          currentPage: page,
-          totalPages,
-          totalCount,
-          limit,
-          hasNextPage: page < totalPages,
-          hasPrevPage: page > 1,
-        },
-        filters: {
-          applied: { search, status, type, category },
-          options: cachedFilters || { statuses: [], types: [], categories: [] }, // Use cached filters
-        },
+      data: paginatedEips,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages,
       },
+      filters: filtersData || { statuses: [], types: [], categories: [] },
+      statistics: statsData || null,
       lastUpdate: lastUpdate || null,
-      timestamp: new Date().toISOString(),
+      protocol,
     });
-  } catch (error) {
-    console.error("API: [/api/eips/list] - Error fetching proposals:", error);
-    const protocolKey = new URL(request.url).searchParams.get("protocol") || "ethereum";
+  } catch (error: any) {
+    console.error("Error fetching EIPs:", error);
     return NextResponse.json(
       {
         success: false,
-        error: "Failed to fetch proposals list",
-        details: error instanceof Error ? error.message : String(error),
-        protocol: getProtocolConfig(protocolKey),
-        timestamp: new Date().toISOString(),
+        error: "Failed to fetch EIPs",
+        details: error.message,
       },
       { status: 500 }
     );

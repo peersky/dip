@@ -1,6 +1,12 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getTenantInfo } from "./lib/subdomain-utils";
+
+// Define your main domain and known protocol subdomains.
+// This should ideally be sourced from the same place as getProtocolConfig if possible,
+// or kept in sync.
+const MAIN_DOMAIN = process.env.NEXT_PUBLIC_BASE_URL ? new URL(process.env.NEXT_PUBLIC_BASE_URL).hostname.replace(/^www\./, "") : "dip.box";
+const PROTOCOL_SUBDOMAINS = ["ethereum", "rollup", "starknet", "arbitrum", "polygon"]; // Add other protocol subdomains here
+const AUTH_SUBDOMAIN = "auth";
 
 // Separate page and API endpoints for clearer management
 // const authenticatedPages = [];
@@ -11,67 +17,65 @@ import { getTenantInfo } from "./lib/subdomain-utils";
 // Static paths that should bypass middleware
 const staticPaths = ["/", "/favicon.ico", "/logo.png", "/advanturista.png", "/clouds.png", "/globe.svg", "/next.svg", "/vercel.svg", "/window.svg", "/file.svg"];
 
-export async function middleware(request: NextRequest) {
-  console.log("middleware");
-  const { pathname } = request.nextUrl;
-  const hostname = request.headers.get("host") || "";
-  const tenantInfo = getTenantInfo(hostname);
+export function middleware(request: NextRequest) {
+  const url = request.nextUrl.clone(); // Clone the URL to modify it
+  let hostname = request.headers.get("host");
 
-  // Clone the URL to modify it
-  const url = request.nextUrl.clone();
-
-  // Add tenant info to headers for use in components
-  const response = NextResponse.next();
-  response.headers.set("x-tenant-subdomain", tenantInfo.subdomain);
-  response.headers.set("x-tenant-protocol", tenantInfo.protocol);
-  response.headers.set("x-tenant-is-auth", tenantInfo.isAuthDomain.toString());
-  response.headers.set("x-tenant-is-main", tenantInfo.isMainDomain.toString());
-
-  // Handle auth domain routing
-  if (tenantInfo.isAuthDomain) {
-    // Auth domain should only handle OAuth callbacks
-    if (!url.pathname.startsWith("/auth/")) {
-      // Redirect to main domain for non-auth routes
-      url.hostname = "dip.box";
-      return NextResponse.redirect(url);
+  if (!hostname) {
+    // Try to get it from the URL as a fallback (e.g., during Vercel builds or specific environments)
+    hostname = url.host;
+    if (!hostname) {
+      console.warn("Middleware: Hostname not found in headers or URL. Skipping rewrite.");
+      return NextResponse.next();
     }
   }
 
-  // Skip middleware for:
-  // 1. Static files
-  // 2. Next.js internal requests
-  // 3. Static paths
-  // 4. Data requests for static paths
+  // For local development, hostname might include the port.
+  hostname = hostname.split(":")[0];
+
+  const currentPath = url.pathname;
+
+  // Prevent rewrite for API routes, static assets, and Next.js specific paths
   if (
-    pathname.startsWith("/_next/") || // Next.js internal
-    pathname.includes(".") || // Static files
-    staticPaths.includes(pathname) || // Static paths
-    (pathname.startsWith("/_next/data/") && pathname.endsWith("/index.json")) // Data requests for index
+    currentPath.startsWith("/api/") ||
+    currentPath.startsWith("/_next/") ||
+    currentPath.startsWith("/static/") ||
+    currentPath.startsWith("/favicon.ico") ||
+    currentPath.includes(".") // Heuristic for files with extensions like .png, .jpg, .css, .js
   ) {
     return NextResponse.next();
   }
 
-  // Create response after authentication check
-  const responseAfterAuth = NextResponse.next();
+  // Handle subdomain.localhost for local development
+  if (hostname.endsWith(".localhost")) {
+    const parts = hostname.split(".");
+    if (parts.length === 2) {
+      // e.g., ethereum.localhost
+      const subdomain = parts[0];
+      if (PROTOCOL_SUBDOMAINS.includes(subdomain) || subdomain === AUTH_SUBDOMAIN) {
+        url.pathname = `/${subdomain}${currentPath}`;
+        // console.log(`Middleware: Rewriting ${hostname}${request.nextUrl.pathname} to ${url.pathname}`);
+        return NextResponse.rewrite(url);
+      }
+    }
+  } else if (hostname !== MAIN_DOMAIN && hostname.endsWith(`.${MAIN_DOMAIN}`)) {
+    // Handle actual subdomains like ethereum.dip.box
+    const subdomain = hostname.replace(`.${MAIN_DOMAIN}`, "");
+    if (PROTOCOL_SUBDOMAINS.includes(subdomain) || subdomain === AUTH_SUBDOMAIN) {
+      url.pathname = `/${subdomain}${currentPath}`;
+      // console.log(`Middleware: Rewriting ${hostname}${request.nextUrl.pathname} to ${url.pathname}`);
+      return NextResponse.rewrite(url);
+    }
+  }
 
-  // For all requests, ensure the Cache-Control headers are set properly
-  responseAfterAuth.headers.set("Cache-Control", "no-store, must-revalidate, max-age=0");
-  responseAfterAuth.headers.set("Pragma", "no-cache");
-  responseAfterAuth.headers.set("Expires", "0");
-
-  return responseAfterAuth;
+  // No rewrite for main domain or unrecognized hostnames
+  return NextResponse.next();
 }
 
-// Update the matcher to use exact matching instead of wildcards for the API routes
+// Matcher to specify paths where the middleware should run.
+// We want it to run on most paths to catch subdomain requests.
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    "/((?!api|_next/static|_next/image|favicon.ico).*)",
+    "/((?!api|_next/static|_next/image|static|favicon.ico|sitemap.xml|robots.txt).*)", // Adjusted matcher
   ],
 };

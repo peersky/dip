@@ -13,37 +13,10 @@ export interface TenantInfo {
  * Extract tenant information from hostname
  */
 export function getTenantInfo(hostname: string): TenantInfo {
-  // Remove port if present (for localhost development)
   const cleanHostname = hostname.split(":")[0];
 
-  // Handle localhost development
+  // Handle exact localhost or 127.0.0.1 as main for card view testing
   if (cleanHostname === "localhost" || cleanHostname === "127.0.0.1") {
-    // When NEXT_PUBLIC_BASE_URL is localhost:3000, treat localhost as the main domain for testing cards view.
-    // For testing specific subdomains locally, you'd typically use /etc/hosts and a different NEXT_PUBLIC_BASE_URL.
-    return {
-      subdomain: "main",
-      protocol: "main",
-      isAuthDomain: false,
-      isMainDomain: true, // Treat localhost as the main domain for card view testing
-    };
-  }
-
-  // Split hostname into parts
-  const parts = cleanHostname.split(".");
-
-  // Handle different domain structures
-  if (parts.length >= 3) {
-    // subdomain.dip.box format
-    const subdomain = parts[0];
-
-    return {
-      subdomain,
-      protocol: subdomain === "auth" ? "auth" : subdomain,
-      isAuthDomain: subdomain === "auth",
-      isMainDomain: false,
-    };
-  } else if (parts.length === 2 && parts[1] === "box" && parts[0] === "dip") {
-    // dip.box (main domain)
     return {
       subdomain: "main",
       protocol: "main",
@@ -52,12 +25,51 @@ export function getTenantInfo(hostname: string): TenantInfo {
     };
   }
 
-  // Fallback
+  const parts = cleanHostname.split(".");
+
+  // Handle subdomain.localhost for local development
+  if (parts.length === 2 && parts[1] === "localhost") {
+    const subdomain = parts[0];
+    return {
+      subdomain,
+      protocol: subdomain === "auth" ? "auth" : subdomain,
+      isAuthDomain: subdomain === "auth",
+      isMainDomain: false,
+    };
+  }
+
+  // Handle subdomain.dip.box (production-like structure)
+  if (parts.length >= 3 && parts[parts.length - 1] === "box" && parts[parts.length - 2] === "dip") {
+    const subdomain = parts[0];
+    return {
+      subdomain,
+      protocol: subdomain === "auth" ? "auth" : subdomain,
+      isAuthDomain: subdomain === "auth",
+      isMainDomain: false,
+    };
+  }
+
+  // Handle dip.box (main domain, production-like structure)
+  if (parts.length === 2 && parts[1] === "box" && parts[0] === "dip") {
+    return {
+      subdomain: "main",
+      protocol: "main",
+      isAuthDomain: false,
+      isMainDomain: true,
+    };
+  }
+
+  // Fallback if no other condition is met (e.g., unexpected hostname, or if NEXT_PUBLIC_BASE_URL is not dip.box based)
+  // This could also be a deployed environment that doesn't match dip.box, like a Vercel preview URL.
+  // For Vercel preview URLs (e.g., project-git-branch-org.vercel.app),
+  // we might want to treat them as the main domain or a specific test protocol.
+  // For now, we'll keep the main fallback for consistency.
+  console.warn(`Unrecognized hostname format: "${cleanHostname}". Defaulting to main domain. Consider refining getTenantInfo for this case.`);
   return {
-    subdomain: "ethereum",
-    protocol: "ethereum",
+    subdomain: "main",
+    protocol: "main",
     isAuthDomain: false,
-    isMainDomain: false,
+    isMainDomain: true,
   };
 }
 
@@ -78,6 +90,16 @@ export function getProtocolConfig(protocol: string) {
       subdomain: string;
     }
   > = {
+    main: {
+      name: "Decentralised",
+      repoOwner: "decentralised",
+      repoName: "DIPs",
+      defaultBranch: "main",
+      proposalPrefix: "DIP",
+      description: "Decentralised Improvement Protocols",
+      color: "gray",
+      subdomain: "main",
+    },
     ethereum: {
       name: "Ethereum",
       repoOwner: process.env.NEXT_PUBLIC_ETHEREUM_REPO_OWNER || "ethereum",
@@ -131,7 +153,7 @@ export function getProtocolConfig(protocol: string) {
     // Add more protocols as needed
   };
 
-  return configs[protocol] || configs.ethereum; // Fallback to ethereum
+  return configs[protocol] || configs.main; // Fallback to main instead of ethereum
 }
 
 /**
