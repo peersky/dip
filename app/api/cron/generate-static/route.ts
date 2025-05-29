@@ -89,20 +89,9 @@ const repositories: RepositoryConfig[] = [
     eipsFolder: "AIPS",
     protocol: "arbitrum",
     proposalPrefix: "AIP",
-    enabled: false,
+    enabled: true,
     description: "Arbitrum Improvement Proposals",
     website: "https://github.com/arbitrum-foundation/AIPs",
-  },
-  {
-    owner: "maticnetwork",
-    repo: "Polygon-Improvement-Proposals",
-    branch: "main",
-    eipsFolder: "PIPs",
-    protocol: "polygon",
-    proposalPrefix: "PIP",
-    enabled: true,
-    description: "Polygon Improvement Proposals",
-    website: "https://github.com/maticnetwork/Polygon-Improvement-Proposals",
   },
   // Add more repositories here
   {
@@ -170,7 +159,7 @@ function parseEipData(
     }
     try {
       return value ? new Date(value).toISOString() : defaultValue;
-    } catch (error) {
+    } catch (e) {
       issues.push(`Invalid date format for field '${key}': ${value}`);
       return defaultValue;
     }
@@ -236,23 +225,6 @@ function parseEipData(
   const authorString = getString("author") || getString("authors") || "Unknown Author";
   const { emails, githubHandles } = parseAuthors(authorString);
 
-  // Create metadata object early to avoid reference errors
-  let metadata: Partial<Omit<EipMetadata, "content" | "sha" | "path" | "lastModified">> = {
-    title: getString("title", `Proposal from ${filePath}`, true),
-    description: getString("description"),
-    author: authorString,
-    status: getString("status", "Draft", true),
-    type: "", // Will be populated below
-    category: getString("category"),
-    created: getDateString("created", new Date(0).toISOString(), true),
-    discussionsTo: getString("discussions-to") || getString("discussions_to"),
-    requires: getStringArray("requires"),
-    protocol: protocol,
-    fileSize: fileSize,
-    authorEmails: emails,
-    authorGithubHandles: githubHandles,
-  };
-
   // Improved type detection - handle EIP-specific frontmatter structure
   let detectedType = getString("type");
   if (!detectedType) {
@@ -272,192 +244,10 @@ function parseEipData(
     }
   }
 
-  // Protocol-specific handling for Polygon Improvement Proposals
-  if (!detectedType && protocol === "polygon") {
-    const pipNumber = getString("pip");
-
-    // Check for PIP frontmatter format - Polygon uses both PIP and pip fields
-    if (!pipNumber) {
-      const pipField = getString("PIP");
-      if (pipField) {
-        issues.push(`Found PIP field with uppercase key: ${pipField}`);
-      }
-    }
-
-    // Normalize status values for Polygon PIPs
-    if (protocol === "polygon" && metadata.status) {
-      // Fix common typos and normalize status values
-      const normalizedStatus = metadata.status.toLowerCase().trim();
-
-      if (normalizedStatus === "stagnent" || normalizedStatus === "stagnant") {
-        metadata.status = "Stagnant";
-      } else if (normalizedStatus === "continous" || normalizedStatus === "continuous") {
-        metadata.status = "Living"; // Map to EIP's Living status
-      } else if (normalizedStatus === "final") {
-        metadata.status = "Final";
-      } else if (normalizedStatus === "peer review") {
-        metadata.status = "Review"; // Normalize to EIP's Review status
-      } else if (normalizedStatus === "withdrawn" || normalizedStatus === "withdrawed") {
-        metadata.status = "Withdrawn";
-      }
-    }
-
-    // Special handling for PRC files - Polygon Request for Comments
-    if (filePath.includes("/PRC/")) {
-      detectedType = "Standards Track";
-      if (!metadata.category) {
-        metadata.category = "PRC";
-      }
-
-      // Normalize PRC to App track for consistency with ERCs
-      if (metadata.category === "PRC") {
-        metadata.category = "App";
-      }
-
-      // Special handling for table-based PRC frontmatter
-      if (frontmatterKeys.length === 0) {
-        // Extract data from markdown table format used in some PRC files
-        const tableMatch = mainContent.match(/\|\s*(\d+)\s*\|\s*([^|]+)\|\s*([^|]+)\|\s*([^|]+)\|\s*([^|]+)\|\s*([^|]+)\|\s*([^|]+)\|\s*([^|]+)\|\s*([^|]+)\|/);
-        if (tableMatch) {
-          const [, number, title, description, author, discussion, status, type, category, created] = tableMatch.map((s) => s?.trim());
-
-          if (number) metadata.title = `PRC-${number}: ${title || ""}`.trim();
-          if (description) metadata.description = description;
-          if (author) {
-            metadata.author = author.replace(/@/g, " @").trim();
-            const { emails, githubHandles } = parseAuthors(author);
-            metadata.authorEmails = emails;
-            metadata.authorGithubHandles = githubHandles;
-          }
-          if (status) metadata.status = status;
-          if (created) {
-            try {
-              metadata.created = new Date(created).toISOString();
-            } catch (error) {
-              issues.push(`Invalid date format in table: ${created}`);
-            }
-          }
-        }
-
-        // Also try the simpler format with | symbol at beginning of lines
-        if (!metadata.author || metadata.author === "Unknown Author") {
-          const authorLine = mainContent.split("\n").find((line) => line.startsWith("|") && line.toLowerCase().includes("author") && !line.includes("---"));
-
-          if (authorLine) {
-            const parts = authorLine.split("|");
-            if (parts.length >= 3) {
-              const authorPart = parts[2].trim();
-              if (authorPart) {
-                metadata.author = authorPart.replace(/@/g, " @").trim();
-                const { emails, githubHandles } = parseAuthors(authorPart);
-                metadata.authorEmails = emails;
-                metadata.authorGithubHandles = githubHandles;
-              }
-            }
-          }
-        }
-
-        // Check for a created date line
-        if (metadata.created === new Date(0).toISOString()) {
-          const dateLine = mainContent.split("\n").find((line) => line.startsWith("|") && (line.toLowerCase().includes("created") || line.toLowerCase().includes("date")) && !line.includes("---"));
-
-          if (dateLine) {
-            const parts = dateLine.split("|");
-            if (parts.length >= 3) {
-              const datePart = parts[parts.length - 2].trim();
-              if (datePart) {
-                try {
-                  metadata.created = new Date(datePart).toISOString();
-                } catch (error) {
-                  issues.push(`Invalid date format in table line: ${datePart}`);
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-    // If the file has a pip field or is in the PIPs folder, it's likely a standards track
-    else if (pipNumber || filePath.includes("/PIPs/") || filePath.match(/PIP-\d+\.md$/i)) {
-      detectedType = "Standards Track"; // Default for PIPs
-    }
-
-    // For files without frontmatter, try to extract info from the content
-    if (frontmatterKeys.length === 0) {
-      // Check for placeholder files (files that list other PIPs)
-      if (mainContent.includes("This is a placeholder for PRCs")) {
-        detectedType = "Placeholder";
-        metadata.title = "PRC Placeholder";
-        metadata.description = "Index of Polygon Request for Comments";
-      } else {
-        // Extract title from the first heading
-        const titleMatch = mainContent.match(/^#\s+(.+?)(?:\n|$)/m);
-        if (titleMatch) {
-          metadata.title = titleMatch[1].trim();
-        }
-
-        // Extract author
-        const authorMatch = mainContent.match(/^(?:Author|Authors):\s*(.+?)(?:\n|$)/im);
-        if (authorMatch) {
-          metadata.author = authorMatch[1].trim();
-          const { emails, githubHandles } = parseAuthors(authorMatch[1]);
-          metadata.authorEmails = emails;
-          metadata.authorGithubHandles = githubHandles;
-        }
-
-        // Extract status
-        const statusMatch = mainContent.match(/^Status:\s*(.+?)(?:\n|$)/im);
-        if (statusMatch) {
-          metadata.status = statusMatch[1].trim();
-        }
-
-        // Extract created date
-        const createdMatch = mainContent.match(/^(?:Date|Created):\s*(.+?)(?:\n|$)/im);
-        if (createdMatch) {
-          try {
-            metadata.created = new Date(createdMatch[1].trim()).toISOString();
-          } catch (e) {
-            metadata.created = new Date(0).toISOString();
-          }
-        }
-
-        // Look for PIP number in the content
-        const pipNumberMatch = mainContent.match(/^PIP(?:\s*|-*|:+)\s*(\d+)/im);
-        if (pipNumberMatch && pipNumberMatch[1]) {
-          issues.push(`Extracted PIP number ${pipNumberMatch[1]} from content (not frontmatter)`);
-        }
-      }
-    } else {
-      // Handle the proper frontmatter format like PIP-11
-      if (getString("Author")) {
-        const authorString = getString("Author") || "";
-        metadata.author = authorString;
-        const { emails, githubHandles } = parseAuthors(authorString);
-        metadata.authorEmails = emails;
-        metadata.authorGithubHandles = githubHandles;
-      }
-
-      if (getString("Date")) {
-        try {
-          metadata.created = new Date(getString("Date") || "").toISOString();
-        } catch (error) {
-          issues.push(`Invalid date format in Date field: ${getString("Date")}`);
-        }
-      }
-
-      if (getString("PIP")) {
-        const pipNum = getString("PIP");
-        if (pipNum && metadata.title && !metadata.title.includes(`PIP-${pipNum}`)) {
-          metadata.title = `PIP-${pipNum}: ${metadata.title}`;
-        }
-      }
-    }
-  }
-
   // For other protocols, provide sensible defaults based on common patterns
   if (!detectedType) {
     // If we have a proposal number, it's likely a standards track proposal
-    const hasProposalNumber = getString("snip") || getString("rip") || getString("aip") || getString("pip") || filePath.match(/\d+\.md$/i);
+    const hasProposalNumber = getString("snip") || getString("rip") || getString("aip") || filePath.match(/\d+\.md$/i);
     if (hasProposalNumber) {
       detectedType = "Standards Track";
     }
@@ -470,14 +260,27 @@ function parseEipData(
     detectedType = "SKIP_THIS_PROPOSAL"; // We'll filter this out in processing
   }
 
-  // Set the detected type in the metadata
-  metadata.type = detectedType;
+  const metadata: Partial<Omit<EipMetadata, "content" | "sha" | "path" | "lastModified">> = {
+    title: getString("title", `Proposal from ${filePath}`, true),
+    description: getString("description"),
+    author: authorString,
+    status: getString("status", "Draft", true),
+    type: detectedType,
+    category: getString("category"),
+    created: getDateString("created", new Date(0).toISOString(), true),
+    discussionsTo: getString("discussions-to") || getString("discussions_to"),
+    requires: getStringArray("requires"),
+    protocol: protocol,
+    fileSize: fileSize,
+    authorEmails: emails,
+    authorGithubHandles: githubHandles,
+  };
 
   const enhancedData = {
     wordCount: calculateWordCount(mainContent),
     sections: extractSections(mainContent),
-    authorEmails: metadata.authorEmails || [],
-    authorGithubHandles: metadata.authorGithubHandles || [],
+    authorEmails: emails,
+    authorGithubHandles: githubHandles,
   };
 
   if (issues.length > 0) {
@@ -492,13 +295,6 @@ function extractProposalNumber(filename: string, proposalPrefix: string): string
   const exactRegex = new RegExp(`(?:${proposalPrefix.toLowerCase()})-(\\d+)\\.md$`, "i");
   const exactMatch = filename.match(exactRegex);
   if (exactMatch) return exactMatch[1];
-
-  // Special handling for PRC files in Polygon
-  if (filename.toLowerCase().includes("prc")) {
-    const prcRegex = /prc-(\d+)\.md$/i;
-    const prcMatch = filename.match(prcRegex);
-    if (prcMatch) return prcMatch[1];
-  }
 
   // Then try any number pattern in .md files: 123.md, eip123.md, erc-456-draft.md etc.
   const numberRegex = /(\d+)\.md$/i;
@@ -877,12 +673,12 @@ async function cacheProposalsData(protocol: string, proposals: EipMetadata[]): P
           }
 
           // Normalize application-level categories to "App"
-          if (proposalTrack && ["ERC", "SRC", "Contracts", "Contract", "Application", "Applications", "RRC", "ARC", "PRC"].includes(proposalTrack)) {
+          if (proposalTrack && ["ERC", "SRC", "Contracts", "Contract", "Application", "Applications", "RRC", "ARC"].includes(proposalTrack)) {
             proposalTrack = "App";
           }
 
           // Normalize protocol-specific proposal types to "Core"
-          if (proposalTrack && ["RIP", "AIP", "SNIP", "PIP"].includes(proposalTrack)) {
+          if (proposalTrack && ["RIP", "AIP", "SNIP"].includes(proposalTrack)) {
             proposalTrack = "Core";
           }
         }
@@ -947,12 +743,12 @@ async function cacheProposalsData(protocol: string, proposals: EipMetadata[]): P
       }
 
       // Normalize application-level categories to "App"
-      if (proposalTrack && ["ERC", "SRC", "Contracts", "Contract", "Application", "Applications", "RRC", "ARC", "PRC"].includes(proposalTrack)) {
+      if (proposalTrack && ["ERC", "SRC", "Contracts", "Contract", "Application", "Applications", "RRC", "ARC"].includes(proposalTrack)) {
         proposalTrack = "App";
       }
 
       // Normalize protocol-specific proposal types to "Core"
-      if (proposalTrack && ["RIP", "AIP", "SNIP", "PIP"].includes(proposalTrack)) {
+      if (proposalTrack && ["RIP", "AIP", "SNIP"].includes(proposalTrack)) {
         proposalTrack = "Core";
       }
     }
@@ -1066,37 +862,34 @@ async function cacheProposalsData(protocol: string, proposals: EipMetadata[]): P
   try {
     await pipeline.exec();
     console.log(`INFO: Successfully cached ${proposals.length} proposals, filters, and statistics for ${protocol} in Vercel KV.`);
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`ERROR: Caching proposals for ${protocol} in Vercel KV: ${errorMessage}`);
+  } catch (error: any) {
+    console.error(`ERROR: Caching proposals for ${protocol} in Vercel KV: ${error.message}`);
   }
 }
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const phase = searchParams.get("phase") || "all"; // 'crawl', 'parse', 'stats', or 'all'
-  const protocol = searchParams.get("protocol"); // Optional: only process specific protocol
+  const phase = searchParams.get("phase") || "all"; // 'collect', 'process', or 'all'
 
-  console.log(`CRON JOB: Starting pipeline (phase: ${phase}, protocol: ${protocol || "all"})...`);
+  console.log(`CRON JOB: Starting EIP data pipeline (phase: ${phase})...`);
 
   try {
-    if (phase === "crawl" || phase === "all") {
-      console.log("=== PHASE 1: CRAWLING RAW DATA ===");
+    if (phase === "collect" || phase === "all") {
+      console.log("=== PHASE 1: COLLECTING RAW DATA ===");
+
+      // Seed repository configurations
       await seedRepositoryConfigs();
 
+      // Get repositories from database
       const repos = await prisma.repository.findMany({
-        where: {
-          enabled: true,
-          ...(protocol && { protocol }),
-        },
+        where: { enabled: true },
       });
 
       let totalCollected = 0;
-      let totalSkipped = 0;
       let totalErrors = 0;
 
       for (const repo of repos) {
-        const result = await crawlRepositoryFiles(repo.id, {
+        const result = await collectRawFilesToDatabase(repo.id, {
           owner: repo.owner,
           repo: repo.repo,
           branch: repo.branch,
@@ -1108,29 +901,21 @@ export async function GET(request: NextRequest) {
           website: repo.website ?? undefined,
         });
 
-        totalCollected += result.newFiles;
-        totalSkipped += result.skippedFiles;
+        totalCollected += result.totalFiles;
         totalErrors += result.errors;
       }
 
-      console.log(`✓ Crawl phase completed: ${totalCollected} new files, ${totalSkipped} skipped (unchanged), ${totalErrors} errors`);
+      console.log(`✓ Collection phase completed: ${totalCollected} files collected, ${totalErrors} errors`);
     }
 
-    if (phase === "parse" || phase === "all") {
-      console.log("=== PHASE 2: PARSING RAW DATA ===");
-      const parseResult = await parseRawFilesToProposals(protocol);
-      console.log(`✓ Parse phase completed: ${parseResult.parsed} proposals parsed, ${parseResult.errors} errors`);
-    }
-
-    if (phase === "stats" || phase === "all") {
-      console.log("=== PHASE 3: GENERATING STATISTICS ===");
-      const statsResult = await generateProtocolStatistics(protocol);
-      console.log(`✓ Stats phase completed: ${statsResult.protocols} protocols processed`);
+    if (phase === "process" || phase === "all") {
+      console.log("=== PHASE 2: PROCESSING DATA ===");
+      await processRawFilesToCache();
+      console.log("✓ Processing phase completed");
     }
 
     // Get summary stats
     const summary = await prisma.repository.findMany({
-      where: protocol ? { protocol } : {},
       include: {
         _count: {
           select: {
@@ -1154,7 +939,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       phase,
-      protocol: protocol || "all",
       summary: summary.map((repo) => ({
         protocol: repo.protocol,
         repository: `${repo.owner}/${repo.repo}`,
@@ -1164,13 +948,12 @@ export async function GET(request: NextRequest) {
       })),
       timestamp: new Date().toISOString(),
     });
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error("CRON JOB ERROR:", errorMessage);
+  } catch (error: any) {
+    console.error("CRON JOB ERROR:", error.message);
     return NextResponse.json(
       {
         success: false,
-        error: errorMessage,
+        error: error.message,
         timestamp: new Date().toISOString(),
       },
       { status: 500 }
@@ -1225,9 +1008,9 @@ async function seedRepositoryConfigs(): Promise<void> {
   }
 }
 
-// Pure crawler with smart caching - only fetches and stores raw files
-async function crawlRepositoryFiles(repositoryId: string, config: RepositoryConfig): Promise<{ newFiles: number; skippedFiles: number; errors: number }> {
-  console.log(`Crawling files from ${config.owner}/${config.repo}...`);
+// Collect raw markdown files and store in database
+async function collectRawFilesToDatabase(repositoryId: string, config: RepositoryConfig): Promise<{ totalFiles: number; errors: number }> {
+  console.log(`Collecting raw files from ${config.owner}/${config.repo}...`);
 
   // Create a new crawl run
   const crawlRun = await prisma.crawlRun.create({
@@ -1254,12 +1037,11 @@ async function crawlRepositoryFiles(repositoryId: string, config: RepositoryConf
     },
   });
 
-  let newFiles = 0;
-  let skippedFiles = 0;
+  let totalFiles = 0;
   let errors = 0;
 
   try {
-    console.log(`INFO: Crawling files from ${config.owner}/${config.repo}/${config.eipsFolder}`);
+    console.log(`INFO: Fetching files from ${config.owner}/${config.repo}/${config.eipsFolder}`);
 
     const { data: branchData } = await octokit.rest.repos.getBranch({
       owner: config.owner,
@@ -1289,24 +1071,12 @@ async function crawlRepositoryFiles(repositoryId: string, config: RepositoryConf
 
     const markdownFiles = eipsFolderTree.tree?.filter((item: OctokitTreeItem) => item.type === "blob" && item.path && item.path.endsWith(".md") && !item.path.includes("README") && !item.path.includes("template") && !item.path.includes("TEMPLATE")) || [];
 
-    console.log(`Found ${markdownFiles.length} markdown files to process`);
-
-    // Get existing files from database for comparison
-    const existingFiles = await prisma.rawFile.findMany({
-      where: { repositoryId: repositoryId },
-      select: {
-        githubPath: true,
-        githubSha: true,
-        lastCommitDate: true,
-      },
-    });
-
-    const existingFileMap = new Map(existingFiles.map((file) => [file.githubPath, { sha: file.githubSha, lastCommitDate: file.lastCommitDate }]));
-
     await prisma.crawlRun.update({
       where: { id: crawlRun.id },
       data: { totalFilesFound: markdownFiles.length },
     });
+
+    console.log(`Found ${markdownFiles.length} markdown files to process`);
 
     const batchSize = 5;
     for (let i = 0; i < markdownFiles.length; i += batchSize) {
@@ -1317,13 +1087,6 @@ async function crawlRepositoryFiles(repositoryId: string, config: RepositoryConf
         if (!file.path || !file.sha) return;
 
         const fullPath = `${config.eipsFolder}/${file.path}`;
-        const existingFile = existingFileMap.get(fullPath);
-
-        // Smart caching: skip if SHA hasn't changed
-        if (existingFile && existingFile.sha === file.sha) {
-          skippedFiles++;
-          return;
-        }
 
         try {
           const { data: fileData } = await octokit.rest.repos.getContent({
@@ -1338,7 +1101,7 @@ async function crawlRepositoryFiles(repositoryId: string, config: RepositoryConf
 
           const rawMarkdown = Buffer.from(fileData.content, "base64").toString("utf-8");
 
-          // Store/update raw file in database
+          // Store raw file in database
           await prisma.rawFile.upsert({
             where: {
               repositoryId_githubPath: {
@@ -1364,7 +1127,7 @@ async function crawlRepositoryFiles(repositoryId: string, config: RepositoryConf
             },
           });
 
-          newFiles++;
+          totalFiles++;
         } catch (error: any) {
           console.error(`Error processing file ${fullPath}:`, error.message);
           errors++;
@@ -1377,13 +1140,13 @@ async function crawlRepositoryFiles(repositoryId: string, config: RepositoryConf
       await prisma.crawlRun.update({
         where: { id: crawlRun.id },
         data: {
-          totalProcessed: Math.min(newFiles + skippedFiles, i + batchSize),
+          totalProcessed: Math.min(totalFiles, i + batchSize),
           totalErrors: errors,
         },
       });
 
       // Rate limiting
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // Reduced delay since we're skipping unchanged files
+      await new Promise((resolve) => setTimeout(resolve, 1500));
     }
 
     // Mark crawl as completed
@@ -1392,15 +1155,15 @@ async function crawlRepositoryFiles(repositoryId: string, config: RepositoryConf
       data: {
         status: "completed",
         completedAt: new Date(),
-        totalProcessed: newFiles + skippedFiles,
+        totalProcessed: totalFiles,
         totalErrors: errors,
       },
     });
 
-    console.log(`✓ Crawled ${config.owner}/${config.repo}: ${newFiles} new, ${skippedFiles} skipped, ${errors} errors`);
-    return { newFiles, skippedFiles, errors };
+    console.log(`✓ Collected ${totalFiles} files from ${config.owner}/${config.repo} (${errors} errors)`);
+    return { totalFiles, errors };
   } catch (error: any) {
-    console.error(`✗ Failed to crawl ${config.owner}/${config.repo}:`, error.message);
+    console.error(`✗ Failed to collect from ${config.owner}/${config.repo}:`, error.message);
 
     await prisma.crawlRun.update({
       where: { id: crawlRun.id },
@@ -1412,28 +1175,23 @@ async function crawlRepositoryFiles(repositoryId: string, config: RepositoryConf
       },
     });
 
-    return { newFiles, skippedFiles, errors: errors + 1 };
+    return { totalFiles, errors: errors + 1 };
   }
 }
 
-// Parse raw files from database into structured proposals (no caching yet)
-async function parseRawFilesToProposals(protocolFilter?: string | null): Promise<{ parsed: number; errors: number }> {
-  console.log("Parsing raw files from database...");
+// Process raw files from database and generate statistics
+async function processRawFilesToCache(): Promise<void> {
+  console.log("Processing raw files from database to generate statistics...");
 
-  // Get repositories to process
+  // Get all enabled repositories
   const repositories = await prisma.repository.findMany({
-    where: {
-      enabled: true,
-      ...(protocolFilter && { protocol: protocolFilter }),
-    },
+    where: { enabled: true },
   });
 
-  let totalParsed = 0;
-  let totalErrors = 0;
+  // Group by protocol
+  const protocolGroups: Record<string, any[]> = {};
 
   for (const repo of repositories) {
-    console.log(`Processing ${repo.owner}/${repo.repo} (${repo.protocol})`);
-
     // Get all raw files for this repository
     const rawFiles = await prisma.rawFile.findMany({
       where: { repositoryId: repo.id },
@@ -1441,63 +1199,6 @@ async function parseRawFilesToProposals(protocolFilter?: string | null): Promise
     });
 
     console.log(`Found ${rawFiles.length} raw files for ${repo.owner}/${repo.repo}`);
-
-    // Special handling for Polygon protocol to ensure PRC files are included
-    if (repo.protocol === "polygon") {
-      const prcFiles = rawFiles.filter((file) => file.githubPath.includes("/PRC/") && file.githubPath.endsWith(".md") && !file.githubPath.includes("README") && !file.githubPath.includes("template"));
-
-      if (prcFiles.length > 0) {
-        console.log(`Found ${prcFiles.length} PRC files in ${repo.owner}/${repo.repo}`);
-      }
-    }
-
-    for (const rawFile of rawFiles) {
-      try {
-        const { metadata: parsedMetadata, mainContent, parsingIssues, enhancedData } = parseEipData(rawFile.rawMarkdown, repo.protocol, rawFile.githubPath);
-
-        // Only process if parsing was successful
-        if (parsedMetadata.title && parsedMetadata.type !== "SKIP_THIS_PROPOSAL") {
-          totalParsed++;
-
-          // You could store parsed data in a separate table here if needed
-          // For now, we'll continue to use the existing caching approach
-        } else {
-          console.warn(`Skipped ${rawFile.githubPath}: ${parsingIssues.join(", ")}`);
-        }
-      } catch (error: any) {
-        console.error(`Error parsing ${rawFile.githubPath}:`, error.message);
-        totalErrors++;
-      }
-    }
-  }
-
-  console.log(`Parse completed: ${totalParsed} parsed, ${totalErrors} errors`);
-  return { parsed: totalParsed, errors: totalErrors };
-}
-
-// Generate statistics and cache them for protocols
-async function generateProtocolStatistics(protocolFilter?: string | null): Promise<{ protocols: number }> {
-  console.log("Generating protocol statistics...");
-
-  // Get repositories to process
-  const repositories = await prisma.repository.findMany({
-    where: {
-      enabled: true,
-      ...(protocolFilter && { protocol: protocolFilter }),
-    },
-  });
-
-  // Group by protocol
-  const protocolGroups: Record<string, any[]> = {};
-
-  for (const repo of repositories) {
-    console.log(`Generating stats for ${repo.protocol}: ${repo.owner}/${repo.repo}`);
-
-    // Get all raw files for this repository
-    const rawFiles = await prisma.rawFile.findMany({
-      where: { repositoryId: repo.id },
-      orderBy: { crawledAt: "desc" },
-    });
 
     const processedProposals: EipMetadata[] = [];
 
@@ -1507,21 +1208,13 @@ async function generateProtocolStatistics(protocolFilter?: string | null): Promi
 
         const filename = rawFile.githubPath.split("/").pop() || "";
 
-        // Extract proposal number with protocol-specific logic
+        // Try to get proposal number from frontmatter first, then filename
         let proposalNumber: string | null = null;
 
         if (repo.protocol === "ethereum") {
+          // For EIPs, try the 'eip' field first
           const { data: frontmatter } = matter(rawFile.rawMarkdown);
           proposalNumber = frontmatter.eip ? String(frontmatter.eip) : null;
-        } else if (repo.protocol === "polygon") {
-          const { data: frontmatter } = matter(rawFile.rawMarkdown);
-          proposalNumber = frontmatter.pip ? String(frontmatter.pip) : null;
-        } else if (repo.protocol === "starknet") {
-          const { data: frontmatter } = matter(rawFile.rawMarkdown);
-          proposalNumber = frontmatter.snip ? String(frontmatter.snip) : null;
-        } else if (repo.protocol === "rollup") {
-          const { data: frontmatter } = matter(rawFile.rawMarkdown);
-          proposalNumber = frontmatter.rip ? String(frontmatter.rip) : null;
         }
 
         // Fallback to filename extraction
@@ -1566,15 +1259,10 @@ async function generateProtocolStatistics(protocolFilter?: string | null): Promi
   }
 
   // Generate statistics and cache for each protocol
-  let processedProtocols = 0;
   for (const [protocol, proposals] of Object.entries(protocolGroups)) {
     if (proposals.length > 0) {
-      console.log(`Caching statistics for ${protocol}: ${proposals.length} proposals`);
+      console.log(`Generating statistics for ${protocol}: ${proposals.length} proposals`);
       await cacheProposalsData(protocol, proposals);
-      processedProtocols++;
     }
   }
-
-  console.log(`Statistics generated for ${processedProtocols} protocols`);
-  return { protocols: processedProtocols };
 }

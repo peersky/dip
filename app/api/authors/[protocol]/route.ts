@@ -58,7 +58,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
         .map((a: string) => a.trim())
         .filter(Boolean);
 
-      authors.forEach((author: string) => {
+      authors.forEach((author) => {
         if (!authorMap.has(author)) {
           authorMap.set(author, {
             proposals: [],
@@ -110,7 +110,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
           }
 
           // Normalize protocol-specific proposal types to "Core"
-          if (track && ["RIP", "AIP", "SNIP", "PIP"].includes(track)) {
+          if (track && ["RIP", "AIP", "SNIP"].includes(track)) {
             track = "Core";
           }
         }

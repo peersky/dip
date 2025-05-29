@@ -172,4 +172,4 @@ export const useCreatePR = () => {
 };
 
 // Export types for use in components
-export type { EipListResponse, CreatePRParams };
+export type { EipItem, EipListResponse, EipListParams, CreatePRParams };

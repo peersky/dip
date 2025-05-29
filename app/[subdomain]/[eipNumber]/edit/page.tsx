@@ -1,7 +1,7 @@
 "use client";
 
 import { Container, Title, Stack, Text } from "@mantine/core";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import EipForm, { EipFormSubmitData } from "@/components/eips/EipForm";
 import { getProtocolConfig } from "@/lib/subdomain-utils";
 import { useMemo, useState, useEffect } from "react";
@@ -33,6 +33,7 @@ interface EipFormData {
 
 export default function SubdomainEditEipPage() {
   const params = useParams();
+  const router = useRouter();
   const subdomain = params.subdomain as string;
   const eipNumber = params.eipNumber as string;
 
@@ -69,9 +70,8 @@ export default function SubdomainEditEipPage() {
         } else {
           throw new Error(result.error || `Failed to fetch ${protocolConfig.proposalPrefix} ${eipNumber} data.`);
         }
-      } catch (err: unknown) {
-        const error = err instanceof Error ? err.message : 'An unknown error occurred';
-        setError(error);
+      } catch (err: any) {
+        setError(err.message);
       } finally {
         setIsLoading(false);
       }

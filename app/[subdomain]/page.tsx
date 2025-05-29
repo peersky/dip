@@ -1,13 +1,13 @@
 "use client";
 
-import { Container, Text, Stack, Paper, Group, Button, Badge, TextInput, Select, Card, Pagination, Grid, Divider, Skeleton } from "@mantine/core";
+import { Container, Title, Text, Stack, Paper, Group, Button, Badge, TextInput, Select, Card, Pagination, Grid, Divider, Skeleton } from "@mantine/core";
 import { getProtocolConfig } from "@/lib/subdomain-utils";
 import { IconPlus, IconSearch, IconFilter, IconEye, IconCalendar, IconUser } from "@tabler/icons-react";
 import { useState, useEffect, useMemo } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { ErrorDisplay } from "@/components/shared/ErrorDisplay";
-import { useEipsList } from "@/hooks/useEips";
+import { useEipsList, type EipItem } from "@/hooks/useEips"; // Assuming this hook is still relevant
 
 const statusColors: Record<string, string> = {
   "Draft": "blue",

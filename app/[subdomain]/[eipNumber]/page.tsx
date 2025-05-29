@@ -2,7 +2,7 @@
 
 import { Container, Title, Text, Stack, Group, Button, Badge, Paper, Divider, Breadcrumbs, Anchor, Tabs, Grid } from "@mantine/core";
 import { useState, useEffect, useMemo } from "react";
-import { IconArrowLeft, IconEdit, IconExternalLink, IconCalendar, IconUser, IconFileText, IconClock } from "@tabler/icons-react";
+import { IconArrowLeft, IconEdit, IconExternalLink, IconGitPullRequest, IconEye, IconCalendar, IconUser, IconFileText, IconClock } from "@tabler/icons-react";
 import { useRouter, useParams } from "next/navigation";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { ErrorDisplay } from "@/components/shared/ErrorDisplay";
@@ -85,10 +85,9 @@ export default function SubdomainEipDetailPage() {
         } else {
           throw new Error(data.error || `Failed to load ${protocolConfig.proposalPrefix} ${eipNumber}`);
         }
-      } catch (err: unknown) {
-        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+      } catch (err: any) {
         console.error(`Error loading ${protocolConfig.proposalPrefix} ${eipNumber} for ${subdomain}:`, err);
-        setError(errorMessage || `Failed to load ${protocolConfig.proposalPrefix} ${eipNumber}. Please try again.`);
+        setError(err.message || `Failed to load ${protocolConfig.proposalPrefix} ${eipNumber}. Please try again.`);
       } finally {
         setIsLoading(false);
       }
@@ -111,10 +110,9 @@ export default function SubdomainEipDetailPage() {
                 } else {
                 throw new Error(data.error || `Failed to load ${protocolConfig.proposalPrefix} ${eipNumber}`);
                 }
-            } catch (err: unknown) {
-                const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+            } catch (err: any) {
                 console.error(`Error loading ${protocolConfig.proposalPrefix} ${eipNumber} for ${subdomain}:`, err);
-                setError(errorMessage || `Failed to load ${protocolConfig.proposalPrefix} ${eipNumber}. Please try again.`);
+                setError(err.message || `Failed to load ${protocolConfig.proposalPrefix} ${eipNumber}. Please try again.`);
             } finally {
                 setIsLoading(false);
             }
