@@ -175,7 +175,6 @@ export default function SubdomainNewEipPage() {
             <EipForm
               onSubmit={handleSubmit}
               isEditing={false}
-              protocolConfig={protocolConfig}
             />
           </div>
         )}

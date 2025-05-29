@@ -109,13 +109,66 @@ export async function GET(request: NextRequest) {
     }
 
     let filteredEips = [...eipsList];
+    console.log(`Starting with ${filteredEips.length} total EIPs`);
 
     // Apply filters
     if (status) {
+      const beforeStatusFilter = filteredEips.length;
       filteredEips = filteredEips.filter((eip) => eip.status === status);
+      console.log(`After status filter (${status}): ${filteredEips.length} EIPs (filtered out ${beforeStatusFilter - filteredEips.length})`);
     }
     if (track) {
-      filteredEips = filteredEips.filter((eip) => eip.type === track || eip.category === track);
+      const beforeTrackFilter = filteredEips.length;
+      filteredEips = filteredEips.filter((eip) => {
+        // Apply the same track normalization logic as used in statistics generation
+        let eipTrack = eip.type || eip.category || "Unknown";
+
+        // Apply the same normalization logic as the cron job
+        if (protocol === "ethereum") {
+          if (eip.type === "Standards Track" && eip.category) {
+            // For Standards Track EIPs, use the category but normalize ERC to App
+            if (eip.category === "ERC") {
+              eipTrack = "App";
+            } else {
+              eipTrack = eip.category;
+            }
+          } else {
+            // For Meta and Informational, use the type
+            eipTrack = eip.type || "Unknown";
+          }
+
+          // Additional normalization for any remaining ERC references
+          if (eipTrack === "ERC") {
+            eipTrack = "App";
+          }
+        } else {
+          // For other protocols, prioritize type, then category
+          if (eip.type === "Standards Track") {
+            // For Standards Track proposals, use category if available, otherwise default to "Core"
+            eipTrack = eip.category || "Core";
+          } else {
+            eipTrack = eip.type || eip.category || "Unknown";
+          }
+
+          // Normalize application-level categories to "App"
+          if (eipTrack && ["ERC", "SRC", "Contracts", "Contract", "Application", "Applications", "RRC", "ARC"].includes(eipTrack)) {
+            eipTrack = "App";
+          }
+
+          // Normalize protocol-specific proposal types to "Core"
+          if (eipTrack && ["RIP", "AIP", "SNIP"].includes(eipTrack)) {
+            eipTrack = "Core";
+          }
+        }
+
+        const matches = eipTrack === track;
+        if (beforeTrackFilter <= 10) {
+          // Only log first few for debugging
+          console.log(`EIP-${eip.number}: type="${eip.type}", category="${eip.category}" -> normalized track="${eipTrack}", matches filter "${track}": ${matches}`);
+        }
+        return matches;
+      });
+      console.log(`After track filter (${track}): ${filteredEips.length} EIPs (filtered out ${beforeTrackFilter - filteredEips.length})`);
     }
 
     // Apply search

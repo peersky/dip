@@ -76,6 +76,14 @@ function TrackSubtable({ stats, isLoading, protocolSubdomain }: {
             ? 1 - (trackData.authorsOnFinalizedInTrackCount / trackData.distinctAuthorsInTrackCount)
             : 0;
 
+          // Calculate acceptance rate excluding stagnant and withdrawn proposals
+          const stagnantCount = trackData.statusCountsInTrack?.['Stagnant'] || 0;
+          const withdrawnCount = trackData.statusCountsInTrack?.['Withdrawn'] || 0;
+          const activeProposals = trackData.totalProposalsInTrack - stagnantCount - withdrawnCount;
+          const adjustedAcceptanceRate = activeProposals > 0
+            ? trackData.finalizedProposalsInTrack / activeProposals
+            : 0;
+
           return (
             <Table.Tr key={trackName}>
               <Table.Td>
@@ -141,11 +149,11 @@ function TrackSubtable({ stats, isLoading, protocolSubdomain }: {
                 {isLoading ? <Skeleton height={16} width={40} /> :
                   trackData.distinctAuthorsInTrackCount > 0 ? (
                     <Text
-                      c={trackData.acceptanceScoreForTrack > 0.3 ? 'green' : 'orange'}
+                      c={adjustedAcceptanceRate > 0.3 ? 'green' : 'orange'}
                       fw={500}
                     >
-                      {(trackData.acceptanceScoreForTrack * 100).toFixed(0)}%
-            </Text>
+                      {(adjustedAcceptanceRate * 100).toFixed(0)}%
+                    </Text>
                   ) : (
                     <Text c="dimmed">N/A</Text>
                   )
@@ -159,7 +167,7 @@ function TrackSubtable({ stats, isLoading, protocolSubdomain }: {
                       fw={500}
                     >
                       {(centralizationRate * 100).toFixed(0)}%
-        </Text>
+                    </Text>
                   ) : (
                     <Text c="dimmed">N/A</Text>
                   )
@@ -189,10 +197,21 @@ function ProtocolRow({ protocol, protocolsData, isLoading }: {
     const tracks = Object.values(stats.tracksBreakdown);
     if (tracks.length === 0) return { acceptanceRate: null, centralizationRate: null };
 
-    // Calculate mean acceptance rate across all tracks
+    // Calculate mean acceptance rate across all tracks (excluding stagnant/withdrawn)
     const trackAcceptanceRates = tracks
       .filter(track => track.totalProposalsInTrack > 0)
-      .map(track => track.acceptanceScoreForTrack);
+      .map(track => {
+        // Calculate active proposals (excluding Stagnant and Withdrawn)
+        const stagnantCount = track.statusCountsInTrack?.['Stagnant'] || 0;
+        const withdrawnCount = track.statusCountsInTrack?.['Withdrawn'] || 0;
+        const activeProposals = track.totalProposalsInTrack - stagnantCount - withdrawnCount;
+
+        // If no active proposals, treat as 0% acceptance rate
+        if (activeProposals <= 0) return 0;
+
+        // Calculate acceptance rate based on active proposals only
+        return track.finalizedProposalsInTrack / activeProposals;
+      });
 
     const meanAcceptanceRate = trackAcceptanceRates.length > 0
       ? trackAcceptanceRates.reduce((sum, rate) => sum + rate, 0) / trackAcceptanceRates.length
@@ -397,12 +416,37 @@ export default function HomePage() {
         </Table>
 
          <Center mt="lg">
-            <Text size="sm" c="dimmed" ta="center">
-                Metrics are updated periodically. Acceptance Rate and Centralization are calculated as the mean of track-level values.
-                Acceptance Rate = Average across tracks of (Finalized Proposals / Total Proposals per track).
-                Centralization = Average across tracks of (1 - Authors Accepted / Total Authors per track), where higher % means fewer authors control finalized decisions.
-                Click the arrow icons to expand and view detailed track-level breakdowns for each protocol.
+            <Stack gap="md" maw={800} mx="auto">
+              <Text size="sm" c="dimmed" ta="center" fw={500}>
+                Metrics Explanation
               </Text>
+
+              <Stack gap="xs">
+                <Text size="sm" c="dimmed" ta="center">
+                  <Text span fw={500}>Protocol-Level Aggregates:</Text> Acceptance Rate and Centralization shown in the main table
+                  are calculated as the mean of track-level values (averages across all tracks within each protocol).
+                </Text>
+
+                <Text size="sm" c="dimmed" ta="center">
+                  <Text span fw={500}>Track-Level Metrics:</Text> Detailed breakdowns visible when expanding each protocol row.
+                  Shows individual statistics per track (Core, Interface, App, etc.).
+                </Text>
+
+                <Text size="sm" c="dimmed" ta="center">
+                  <Text span fw={500}>Acceptance Rate:</Text> (Finalized Proposals) ÷ (Active Proposals) where Active = Total - Stagnant - Withdrawn
+                </Text>
+
+                <Text size="sm" c="dimmed" ta="center">
+                  <Text span fw={500}>Centralization:</Text> 1 - (Authors with Finalized Proposals ÷ Total Authors)
+                  — higher % means fewer authors control finalized decisions
+                </Text>
+
+                <Text size="xs" c="dimmed" ta="center" mt="xs">
+                  Click arrow icons to expand protocols and view detailed track-level breakdowns.
+                  Metrics updated periodically from GitHub repositories.
+                </Text>
+              </Stack>
+            </Stack>
         </Center>
       </Stack>
     </Container>
