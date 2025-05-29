@@ -32,6 +32,12 @@ importers:
       '@mdxeditor/editor':
         specifier: ^3.33.0
         version: 3.33.0(@codemirror/language@6.11.0)(@lezer/highlight@1.2.1)(@types/react-dom@19.1.5(@types/react@19.1.6))(@types/react@19.1.6)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(yjs@13.6.27)
+      '@octokit/core':
+        specifier: ^7.0.2
+        version: 7.0.2
+      '@octokit/plugin-rest-endpoint-methods':
+        specifier: ^16.0.0
+        version: 16.0.0(@octokit/core@7.0.2)
       '@octokit/plugin-throttling':
         specifier: ^11.0.1
         version: 11.0.1(@octokit/core@7.0.2)
