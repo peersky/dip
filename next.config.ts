@@ -41,15 +41,15 @@ export default {
       );
     }
 
-    // Help with module resolution
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      "@": ".",
-      "@/components": "./components",
-      "@/lib": "./lib",
-      "@/app": "./app",
-      "@/hooks": "./hooks",
-    };
+    // // Help with module resolution
+    // config.resolve.alias = {
+    //   ...config.resolve.alias,
+    //   "@": ".",
+    //   "@/components": "./components",
+    //   "@/lib": "./lib",
+    //   "@/app": "./app",
+    //   "@/hooks": "./hooks",
+    // };
 
     // Fixes npm packages that depend on `fs` module
     if (!isServer) {
