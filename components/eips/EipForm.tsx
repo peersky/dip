@@ -1,17 +1,16 @@
 "use client";
 
-import { TextInput, Textarea, Button, Stack, Select, Group, Fieldset, Paper, MultiSelect, Text, InputWrapper, Input, Tabs, Alert, LoadingOverlay } from "@mantine/core";
+import { TextInput, Textarea, Button, Stack, Select, Group, Fieldset, Paper, MultiSelect, Text, Input, Tabs, Alert } from "@mantine/core";
 import { useForm, UseFormReturnType } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
-import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
+import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { formatEipForSubmit, generateEipFilename } from "@/lib/eip-utils";
 import ReactMarkdown from 'react-markdown';
 import type { MDXEditorMethods } from '@mdxeditor/editor';
 import { GitHubAuth } from '@/components/GitHubAuth';
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner';
-import { ErrorDisplay } from '@/components/shared/ErrorDisplay';
-import { IconCheck, IconX, IconGitPullRequest } from "@tabler/icons-react";
+import { IconGitPullRequest } from "@tabler/icons-react";
 
 // Dynamically import MarkdownEditor with SSR turned off
 const MarkdownEditor = dynamic(() => import("@/components/shared/MarkdownEditor"), {
