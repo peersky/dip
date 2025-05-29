@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
 
-export async function GET(request: NextRequest, { params }: { params: { protocol: string; number: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ protocol: string; number: string }> }) {
   try {
-    const { protocol, number } = params;
+    const { protocol, number } = await params;
 
     console.log(`Fetching EIP ${number} for protocol: ${protocol}`);
 
@@ -30,7 +30,8 @@ export async function GET(request: NextRequest, { params }: { params: { protocol
       number,
     });
   } catch (error: any) {
-    console.error(`Error fetching EIP ${params.number}:`, error);
+    const { number } = await params;
+    console.error(`Error fetching EIP ${number}:`, error);
     return NextResponse.json(
       {
         success: false,

@@ -4,7 +4,7 @@ import { Container, Title, Text, Stack, Paper, Group, Button, Badge, TextInput, 
 import { getProtocolConfig } from "@/lib/subdomain-utils";
 import { IconPlus, IconSearch, IconFilter, IconEye, IconCalendar, IconUser } from "@tabler/icons-react";
 import { useState, useEffect, useMemo } from "react";
-import { useRouter, useParams } from "next/navigation"; // useParams to get [subdomain]
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { ErrorDisplay } from "@/components/shared/ErrorDisplay";
 import { useEipsList, type EipItem } from "@/hooks/useEips"; // Assuming this hook is still relevant
@@ -22,21 +22,34 @@ const statusColors: Record<string, string> = {
 export default function SubdomainProtocolPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const subdomain = params.subdomain as string; // Get subdomain from route
 
   // Get protocolConfig directly using the subdomain from route params
   // No need for useTenant here for the primary protocolConfig, though it might be used for other tenant info
   const protocolConfig = useMemo(() => getProtocolConfig(subdomain), [subdomain]);
 
-  // Filter states
-  const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const [trackFilter, setTrackFilter] = useState<string | null>(null);
+  // Initialize filter states from URL parameters
+  const [searchQuery, setSearchQuery] = useState(searchParams?.get('search') || "");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchParams?.get('search') || "");
+  const [statusFilter, setStatusFilter] = useState<string | null>(searchParams?.get('status') || null);
+  const [trackFilter, setTrackFilter] = useState<string | null>(searchParams?.get('track') || null);
 
   // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(parseInt(searchParams?.get('page') || '1'));
   const itemsPerPage = 10; // Or make this configurable
+
+  // Update URL when filters change
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (debouncedSearchQuery) params.set('search', debouncedSearchQuery);
+    if (statusFilter) params.set('status', statusFilter);
+    if (trackFilter) params.set('track', trackFilter);
+    if (currentPage > 1) params.set('page', currentPage.toString());
+
+    const newUrl = params.toString() ? `/?${params.toString()}` : '/';
+    router.replace(newUrl, { scroll: false });
+  }, [debouncedSearchQuery, statusFilter, trackFilter, currentPage, router]);
 
   // Debounce search query
   useEffect(() => {
@@ -126,7 +139,7 @@ export default function SubdomainProtocolPage() {
           </div>
           <Button
             leftSection={<IconPlus size="1rem" />}
-            onClick={() => router.push(`/${subdomain}/new`)}
+            onClick={() => router.push(`/new`)}
           >
             Create New {protocolConfig.proposalPrefix}
           </Button>
@@ -242,7 +255,7 @@ export default function SubdomainProtocolPage() {
                 withBorder
                 p="lg"
                 style={{ cursor: 'pointer' }}
-                onClick={() => router.push(`/${subdomain}/${eip.number}`)}
+                onClick={() => router.push(`/${eip.number}`)}
               >
                 <Stack gap="md">
                   <Group justify="space-between" align="flex-start">
@@ -268,7 +281,7 @@ export default function SubdomainProtocolPage() {
                       leftSection={<IconEye size="0.9rem" />}
                       onClick={(e) => {
                         e.stopPropagation();
-                        router.push(`/${subdomain}/${eip.number}`);
+                        router.push(`/${eip.number}`);
                       }}
                     >
                       View

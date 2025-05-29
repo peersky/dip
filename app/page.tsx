@@ -1,9 +1,9 @@
 "use client";
 
-import { Container, Title, Text, Stack, Box, Table, Anchor, Group, Skeleton, Center, Button } from "@mantine/core";
+import { Container, Title, Text, Stack, Box, Table, Anchor, Group, Skeleton, Center, Button, Collapse } from "@mantine/core";
 import { getProtocolConfig } from "@/lib/subdomain-utils"; // getProtocolConfig for colors etc.
 import { ProtocolStatistics, useAllProtocolsStats } from "@/hooks/useProtocolStats";
-import { IconArrowUp, IconArrowDown, IconExternalLink } from "@tabler/icons-react";
+import { IconArrowUp, IconArrowDown, IconExternalLink, IconChevronDown, IconChevronRight } from "@tabler/icons-react";
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
@@ -21,55 +21,269 @@ const getProtocolUrl = (subdomain: string) => {
   return `http${baseUrl.startsWith('localhost') ? '' : 's'}://${subdomain}.${baseUrl}`;
 };
 
-// Component to render individual protocol row with stats
-function ProtocolRow({ protocol, allTracks, protocolsData, isLoading }: {
+// Component to render track subtable rows
+function TrackSubtable({ stats, isLoading, protocolSubdomain }: {
+  stats?: ProtocolStatistics,
+  isLoading: boolean,
+  protocolSubdomain: string
+}) {
+  if (!stats?.tracksBreakdown) return null;
+
+  const tracks = Object.entries(stats.tracksBreakdown).sort(([,a], [,b]) => b.totalProposalsInTrack - a.totalProposalsInTrack);
+
+  // Get all unique statuses across all proposals to create dynamic columns
+  const allStatuses = new Set<string>();
+  if (stats.statusCounts) {
+    Object.keys(stats.statusCounts).forEach(status => allStatuses.add(status));
+  }
+  const statusList = Array.from(allStatuses).sort();
+
+  // Helper to generate track URL
+  const getTrackUrl = (trackName: string) => {
+    return `http${process.env.NODE_ENV === 'development' ? '' : 's'}://${protocolSubdomain}.${process.env.NEXT_PUBLIC_BASE_URL || (process.env.NODE_ENV === "development" ? "localhost:3000" : "dip.box")}?track=${encodeURIComponent(trackName)}`;
+  };
+
+  // Helper to generate status+track filter URL
+  const getStatusTrackUrl = (status: string, trackName: string) => {
+    return `http${process.env.NODE_ENV === 'development' ? '' : 's'}://${protocolSubdomain}.${process.env.NEXT_PUBLIC_BASE_URL || (process.env.NODE_ENV === "development" ? "localhost:3000" : "dip.box")}?status=${encodeURIComponent(status)}&track=${encodeURIComponent(trackName)}`;
+  };
+
+  return (
+    <Table
+      withTableBorder
+      withColumnBorders
+      mt="xs"
+      style={{ width: '100%' }}
+    >
+      <Table.Thead>
+        <Table.Tr>
+          <Table.Th>Track</Table.Th>
+          <Table.Th ta="right">Total</Table.Th>
+          <Table.Th ta="right">Authors</Table.Th>
+          <Table.Th ta="right">Authors Accepted</Table.Th>
+          {statusList.map(status => (
+            <Table.Th key={status} ta="right">{status}</Table.Th>
+          ))}
+          <Table.Th ta="right">Acceptance Rate</Table.Th>
+          <Table.Th ta="right">Centralization</Table.Th>
+        </Table.Tr>
+      </Table.Thead>
+      <Table.Tbody>
+        {tracks.map(([trackName, trackData]) => {
+          // Calculate centralization rate: higher % = more centralized
+          // (fewer distinct authors getting finalized relative to total authors)
+          const centralizationRate = trackData.distinctAuthorsInTrackCount > 0
+            ? 1 - (trackData.authorsOnFinalizedInTrackCount / trackData.distinctAuthorsInTrackCount)
+            : 0;
+
+          return (
+            <Table.Tr key={trackName}>
+              <Table.Td>
+                <Anchor
+                  component={Link}
+                  href={getTrackUrl(trackName)}
+                  target="_blank"
+                  fw={500}
+                  size="sm"
+                >
+                  {trackName} <IconExternalLink size={12} style={{ verticalAlign: 'middle' }} />
+                </Anchor>
+              </Table.Td>
+              <Table.Td ta="right">
+                {isLoading ? <Skeleton height={16} width={40} /> : trackData.totalProposalsInTrack}
+              </Table.Td>
+              <Table.Td ta="right">
+                {isLoading ? <Skeleton height={16} width={40} /> :
+                  trackData.distinctAuthorsInTrackCount > 0 ? (
+                    <Anchor
+                      component={Link}
+                      href={`/authors?protocol=${protocolSubdomain}&track=${encodeURIComponent(trackName)}`}
+                      c="blue"
+                    >
+                      {trackData.distinctAuthorsInTrackCount}
+                    </Anchor>
+                  ) : 'No data'
+                }
+              </Table.Td>
+              <Table.Td ta="right">
+                {isLoading ? <Skeleton height={16} width={40} /> :
+                  trackData.authorsOnFinalizedInTrackCount > 0 ? (
+                    <Anchor
+                      component={Link}
+                      href={`/authors?protocol=${protocolSubdomain}&track=${encodeURIComponent(trackName)}&status=finalized`}
+                      c="green"
+                    >
+                      {trackData.authorsOnFinalizedInTrackCount}
+                    </Anchor>
+                  ) : 'None'
+                }
+              </Table.Td>
+              {statusList.map(status => (
+                <Table.Td key={status} ta="right">
+                  {isLoading ? <Skeleton height={16} width={30} /> :
+                    trackData.statusCountsInTrack?.[status] > 0 ? (
+                      <Anchor
+                        component={Link}
+                        href={getStatusTrackUrl(status, trackName)}
+                        target="_blank"
+                        c="blue"
+                        size="sm"
+                      >
+                        {trackData.statusCountsInTrack[status]}
+                      </Anchor>
+                    ) : (
+                      <Text size="sm" c="dimmed">0</Text>
+                    )
+                  }
+                </Table.Td>
+              ))}
+              <Table.Td ta="right">
+                {isLoading ? <Skeleton height={16} width={40} /> :
+                  trackData.distinctAuthorsInTrackCount > 0 ? (
+                    <Text
+                      c={trackData.acceptanceScoreForTrack > 0.3 ? 'green' : 'orange'}
+                      fw={500}
+                    >
+                      {(trackData.acceptanceScoreForTrack * 100).toFixed(0)}%
+            </Text>
+                  ) : (
+                    <Text c="dimmed">N/A</Text>
+                  )
+                }
+              </Table.Td>
+              <Table.Td ta="right">
+                {isLoading ? <Skeleton height={16} width={40} /> :
+                  trackData.distinctAuthorsInTrackCount > 0 ? (
+                    <Text
+                      c={centralizationRate > 0.5 ? 'red' : centralizationRate > 0.3 ? 'orange' : 'green'}
+                      fw={500}
+                    >
+                      {(centralizationRate * 100).toFixed(0)}%
+        </Text>
+                  ) : (
+                    <Text c="dimmed">N/A</Text>
+                  )
+                }
+              </Table.Td>
+            </Table.Tr>
+          );
+        })}
+      </Table.Tbody>
+    </Table>
+  );
+}
+
+// Component to render individual protocol row with expandable subtable
+function ProtocolRow({ protocol, protocolsData, isLoading }: {
   protocol: EnrichedProtocol,
-  allTracks: string[],
   protocolsData: Record<string, ProtocolStatistics>,
   isLoading: boolean
 }) {
+  const [expanded, setExpanded] = useState(false);
   const stats = protocolsData[protocol.subdomain];
 
   return (
-    <Table.Tr key={protocol.subdomain}>
-      <Table.Td>
-        <Anchor component={Link} href={protocol.url} target="_blank" c={protocol.color} fw={500}>
-          {protocol.name} <IconExternalLink size={14} style={{ verticalAlign: 'middle' }} />
-        </Anchor>
-        <Text size="xs" c="dimmed">{protocol.description}</Text>
-      </Table.Td>
-      <Table.Td ta="right">
-        {isLoading ? <Skeleton height={16} width={40} /> : (stats?.totalProposals ?? 'N/A')}
-      </Table.Td>
-      <Table.Td ta="right">
-        {isLoading ? <Skeleton height={16} width={40} /> : (stats?.distinctAuthorsCount ?? 'N/A')}
-      </Table.Td>
-      <Table.Td ta="right">
-        {isLoading ? <Skeleton height={16} width={40} /> :
-          (stats && typeof stats.acceptanceScore === 'number' ? `${(stats.acceptanceScore * 100).toFixed(0)}%` : 'N/A')}
-      </Table.Td>
-      {/* Dynamic track columns */}
-      {allTracks.map(track => (
-        <Table.Td key={track} ta="right">
+    <>
+      <Table.Tr key={protocol.subdomain}>
+        <Table.Td>
+          <Group gap="sm">
+            <Button
+              variant="subtle"
+              size="xs"
+              p={4}
+              onClick={() => setExpanded(!expanded)}
+              style={{ minWidth: 'auto' }}
+            >
+              {expanded ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
+            </Button>
+            <Box>
+              <Anchor component={Link} href={protocol.url} target="_blank" c={protocol.color} fw={500}>
+                {protocol.name} <IconExternalLink size={14} style={{ verticalAlign: 'middle' }} />
+              </Anchor>
+              <Text size="xs" c="dimmed">{protocol.description}</Text>
+            </Box>
+          </Group>
+        </Table.Td>
+        <Table.Td ta="right">
+          {isLoading ? <Skeleton height={16} width={40} /> : (stats?.totalProposals ?? 'N/A')}
+        </Table.Td>
+        <Table.Td ta="right">
+          {isLoading ? <Skeleton height={16} width={40} /> :
+            stats?.distinctAuthorsCount ? (
+              <Anchor
+                component={Link}
+                href={`/authors?protocol=${protocol.subdomain}`}
+                c="blue"
+              >
+                {stats.distinctAuthorsCount}
+              </Anchor>
+            ) : 'N/A'
+          }
+        </Table.Td>
+        <Table.Td ta="right">
+          {isLoading ? <Skeleton height={16} width={40} /> :
+            stats?.authorsOnFinalizedCount ? (
+              <Anchor
+                component={Link}
+                href={`/authors?protocol=${protocol.subdomain}&status=finalized`}
+                c="green"
+              >
+                {stats.authorsOnFinalizedCount}
+              </Anchor>
+            ) : 'N/A'
+          }
+        </Table.Td>
+        <Table.Td ta="right">
+          {isLoading ? <Skeleton height={16} width={40} /> :
+            (stats && typeof stats.acceptanceScore === 'number' ? (
+              <Text
+                c={stats.acceptanceScore > 0.3 ? 'green' : 'orange'}
+                fw={500}
+              >
+                {(stats.acceptanceScore * 100).toFixed(0)}%
+          </Text>
+            ) : 'N/A')
+          }
+        </Table.Td>
+        <Table.Td ta="right">
           {isLoading ? <Skeleton height={16} width={40} /> :
             (() => {
-              const trackData = stats?.tracksBreakdown?.[track];
-              if (!trackData) return '0';
-              return trackData.totalProposalsInTrack.toString();
+              if (!stats?.distinctAuthorsCount || !stats?.authorsOnFinalizedCount) return 'N/A';
+              const centralizationRate = 1 - (stats.authorsOnFinalizedCount / stats.distinctAuthorsCount);
+              return (
+                <Text
+                  c={centralizationRate > 0.5 ? 'red' : centralizationRate > 0.3 ? 'orange' : 'green'}
+                  fw={500}
+                >
+                  {(centralizationRate * 100).toFixed(0)}%
+          </Text>
+              );
             })()
           }
         </Table.Td>
-      ))}
-      <Table.Td>
-        {isLoading ? <Skeleton height={12} width={70} /> :
-          (stats?.lastUpdated ? new Date(stats.lastUpdated).toLocaleDateString() : 'N/A')}
-      </Table.Td>
-    </Table.Tr>
+        <Table.Td ta="right">
+          {isLoading ? <Skeleton height={16} width={40} /> :
+            (stats?.tracksBreakdown ? Object.keys(stats.tracksBreakdown).length : 'N/A')
+          }
+        </Table.Td>
+        <Table.Td>
+          {isLoading ? <Skeleton height={12} width={70} /> :
+            (stats?.lastUpdated ? new Date(stats.lastUpdated).toLocaleDateString() : 'N/A')}
+        </Table.Td>
+      </Table.Tr>
+      <Table.Tr>
+        <Table.Td colSpan={8} p={0}>
+          <Collapse in={expanded}>
+            <TrackSubtable stats={stats} isLoading={isLoading} protocolSubdomain={protocol.subdomain} />
+          </Collapse>
+        </Table.Td>
+      </Table.Tr>
+    </>
   );
 }
 
 export default function HomePage() {
-  const [sortField, setSortField] = useState<keyof ProtocolStatistics | 'name' | 'tracksBreakdown'>('totalProposals');
+  const [sortField, setSortField] = useState<keyof ProtocolStatistics | 'name' | 'trackCount'>('totalProposals');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   // Use React Query to fetch all protocols data
@@ -86,7 +300,7 @@ export default function HomePage() {
 
   // Handle error state
   if (error) {
-    return (
+     return (
       <Container size="xl" py="xl">
         <Center>
           <Text c="red">Error loading protocol data: {error.message}</Text>
@@ -95,7 +309,7 @@ export default function HomePage() {
     );
   }
 
-  const ThSortable = ({ children, field }: { children: React.ReactNode; field: keyof ProtocolStatistics | 'name' | 'tracksBreakdown' }) => {
+  const ThSortable = ({ children, field }: { children: React.ReactNode; field: keyof ProtocolStatistics | 'name' | 'trackCount' }) => {
     const isSorted = sortField === field;
     return (
       <Table.Th
@@ -126,7 +340,7 @@ export default function HomePage() {
           </Title>
           <Text size="lg" c="dimmed" maw={700} mx="auto">
             Explore activity and contribution metrics across various improvement proposal repositories.
-            Click on a protocol name to visit its dedicated portal, or view detailed track breakdowns.
+            Click on a protocol name to visit its dedicated portal, or expand rows to view detailed track breakdowns.
           </Text>
         </Box>
 
@@ -134,16 +348,12 @@ export default function HomePage() {
           <Table.Thead>
             <Table.Tr>
               <ThSortable field="name">Protocol</ThSortable>
-              <ThSortable field="totalProposals">Proposals</ThSortable>
-              <ThSortable field="distinctAuthorsCount">Authors (Overall)</ThSortable>
-              <ThSortable field="acceptanceScore">Acceptance (Overall)</ThSortable>
-              {/* Dynamic track headers */}
-              {data?.allTracks.map(track => (
-                <Table.Th key={track} style={{ minWidth: '100px' }}>
-                  <Text size="sm" fw={500}>{track}</Text>
-                  <Text size="xs" c="dimmed">Proposals</Text>
-                </Table.Th>
-              ))}
+              <ThSortable field="totalProposals">Total Proposals</ThSortable>
+              <ThSortable field="distinctAuthorsCount">Total Authors</ThSortable>
+              <ThSortable field="authorsOnFinalizedCount">Finalized Authors</ThSortable>
+              <ThSortable field="acceptanceScore">Acceptance Rate</ThSortable>
+              <Table.Th>Centralization</Table.Th>
+              <ThSortable field="trackCount">Track Count</ThSortable>
               <Table.Th>Last Update</Table.Th>
             </Table.Tr>
           </Table.Thead>
@@ -152,7 +362,6 @@ export default function HomePage() {
               <ProtocolRow
                 key={protocol.subdomain}
                 protocol={protocol}
-                allTracks={data?.allTracks || []}
                 protocolsData={data?.protocolsData || {}}
                 isLoading={isLoading}
               />
@@ -161,9 +370,11 @@ export default function HomePage() {
         </Table>
 
          <Center mt="lg">
-            <Text size="sm" c="dimmed">
-                Metrics are updated periodically. Overall Acceptance Score = (Authors on Any Finalized Proposal) / (Total Distinct Authors Overall). Track columns show proposal counts for each category.
-            </Text>
+            <Text size="sm" c="dimmed" ta="center">
+                Metrics are updated periodically. Acceptance Rate = (Finalized Proposals) / (Total Proposals).
+                Centralization = 1 - (Authors Accepted / Total Authors) where higher % means fewer authors control finalized decisions.
+                Click the arrow icons to expand and view detailed track-level breakdowns for each protocol.
+              </Text>
         </Center>
       </Stack>
     </Container>

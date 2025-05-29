@@ -178,7 +178,7 @@ export default function SubdomainEipDetailPage() {
   }
 
   const breadcrumbItems = [
-    { title: `${protocolConfig.name} ${protocolConfig.proposalPrefix}s`, href: `/${subdomain}` },
+    { title: `${protocolConfig.name} ${protocolConfig.proposalPrefix}s`, href: `/` },
     { title: `${protocolConfig.proposalPrefix}-${eip.number}`, href: '#' }
   ].map((item, index) => (
     <Anchor

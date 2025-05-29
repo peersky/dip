@@ -23,7 +23,7 @@ GITHUB_WEBHOOK_SECRET=your_webhook_secret_here
 NEXT_PUBLIC_ETHEREUM_REPO_OWNER=peeramid-labs
 NEXT_PUBLIC_ETHEREUM_REPO_NAME=EIPs
 NEXT_PUBLIC_ETHEREUM_REPO_BRANCH=master
-NEXT_PUBLIC_ETHEREUM_REPO_DESCRIPTION="Ethereum Improvement Proposals (Testing via peeramid-labs fork)"
+NEXT_PUBLIC_ETHEREUM_REPO_DESCRIPTION="Ethereum Improvement Proposals"
 
 # For production with official repo:
 NEXT_PUBLIC_ETHEREUM_REPO_OWNER=ethereum

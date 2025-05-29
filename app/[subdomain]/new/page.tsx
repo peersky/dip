@@ -147,7 +147,7 @@ export default function SubdomainNewEipPage() {
                 </Button>
                 <Button
                   variant="subtle"
-                  onClick={() => router.push(`/${subdomain}`)}
+                  onClick={() => router.push(`/`)}
                 >
                   Back to {protocolConfig.name} list
                 </Button>

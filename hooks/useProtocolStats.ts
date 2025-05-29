@@ -4,9 +4,11 @@ import { getAllProtocols, getProtocolConfig } from "@/lib/subdomain-utils";
 // Matches the structure in the cron job for finalTracksBreakdown
 export interface TrackBreakdownStats {
   totalProposalsInTrack: number;
+  finalizedProposalsInTrack: number;
   distinctAuthorsInTrackCount: number;
   authorsOnFinalizedInTrackCount: number;
   acceptanceScoreForTrack: number;
+  statusCountsInTrack: Record<string, number>;
 }
 
 export interface ProtocolStatistics {
@@ -82,7 +84,9 @@ const fetchAllProtocolsStats = async (): Promise<AllProtocolsStatsResult> => {
 
   return {
     protocolsData,
-    allTracks: Array.from(tracks).sort(),
+    allTracks: Array.from(tracks)
+      .filter((track) => track !== "Unknown Type" && track !== "SKIP_THIS_PROPOSAL")
+      .sort(),
     protocols: baseProtocols,
   };
 };

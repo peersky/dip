@@ -117,7 +117,7 @@ export function getProtocolConfig(protocol: string) {
       defaultBranch: process.env.NEXT_PUBLIC_ROLLUP_REPO_BRANCH || "master",
       proposalPrefix: "RIP",
       description: process.env.NEXT_PUBLIC_ROLLUP_REPO_DESCRIPTION || "Rollup Improvement Proposals",
-      color: "green",
+      color: "blue",
       subdomain: "rollup",
     },
     starknet: {
@@ -127,7 +127,7 @@ export function getProtocolConfig(protocol: string) {
       defaultBranch: process.env.NEXT_PUBLIC_STARKNET_REPO_BRANCH || "main",
       proposalPrefix: "SNIP",
       description: process.env.NEXT_PUBLIC_STARKNET_REPO_DESCRIPTION || "Starknet Improvement Proposals",
-      color: "purple",
+      color: "blue",
       subdomain: "starknet",
     },
     arbitrum: {
@@ -137,7 +137,7 @@ export function getProtocolConfig(protocol: string) {
       defaultBranch: process.env.NEXT_PUBLIC_ARBITRUM_REPO_BRANCH || "main",
       proposalPrefix: "AIP",
       description: process.env.NEXT_PUBLIC_ARBITRUM_REPO_DESCRIPTION || "Arbitrum Improvement Proposals",
-      color: "orange",
+      color: "blue",
       subdomain: "arbitrum",
     },
     polygon: {
@@ -147,7 +147,7 @@ export function getProtocolConfig(protocol: string) {
       defaultBranch: process.env.NEXT_PUBLIC_POLYGON_REPO_BRANCH || "main",
       proposalPrefix: "PIP",
       description: process.env.NEXT_PUBLIC_POLYGON_REPO_DESCRIPTION || "Polygon Improvement Proposals",
-      color: "violet",
+      color: "blue",
       subdomain: "polygon",
     },
     // Add more protocols as needed

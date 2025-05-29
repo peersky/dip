@@ -244,9 +244,20 @@ function parseEipData(
     }
   }
 
+  // For other protocols, provide sensible defaults based on common patterns
+  if (!detectedType) {
+    // If we have a proposal number, it's likely a standards track proposal
+    const hasProposalNumber = getString("snip") || getString("rip") || getString("aip") || filePath.match(/\d+\.md$/i);
+    if (hasProposalNumber) {
+      detectedType = "Standards Track";
+    }
+  }
+
+  // Final fallback - if we still don't have a type, skip this proposal entirely
+  // rather than creating "Unknown Type" entries
   if (!detectedType) {
     issues.push(`No type field found. Available keys: ${frontmatterKeys.join(", ")}`);
-    detectedType = "Unknown Type";
+    detectedType = "SKIP_THIS_PROPOSAL"; // We'll filter this out in processing
   }
 
   const metadata: Partial<Omit<EipMetadata, "content" | "sha" | "path" | "lastModified">> = {
@@ -411,7 +422,7 @@ async function fetchProposalsFromRepository(config: RepositoryConfig): Promise<E
 
           const proposalNumber = extractProposalNumber(entry.path.split("/").pop() || "", config.proposalPrefix);
 
-          if (proposalNumber && parsedMetadata.title) {
+          if (proposalNumber && parsedMetadata.title && parsedMetadata.type !== "SKIP_THIS_PROPOSAL") {
             processedCount++;
             return {
               number: proposalNumber,
@@ -475,6 +486,79 @@ async function cacheProposalsData(protocol: string, proposals: EipMetadata[]): P
     return;
   }
 
+  // Author deduplication functions
+  function extractGitHubHandle(authorName: string): string | null {
+    const match = authorName.match(/@([a-zA-Z0-9_-]+)/);
+    return match ? match[1].toLowerCase() : null;
+  }
+
+  function normalizeAuthorName(authorName: string): string {
+    return authorName.toLowerCase().replace(/\s+/g, " ").replace(/[(),]/g, "").trim();
+  }
+
+  function getCanonicalAuthorName(names: string[]): string {
+    return names.sort((a, b) => {
+      const scoreA = a.length + (a.match(/[()]/g) || []).length * 2;
+      const scoreB = b.length + (b.match(/[()]/g) || []).length * 2;
+      return scoreA - scoreB;
+    })[0];
+  }
+
+  function deduplicateAuthors(authors: string[]): Map<string, string> {
+    const handleMap = new Map<string, string[]>();
+    const nameMap = new Map<string, string[]>();
+    const deduplicationMap = new Map<string, string>();
+
+    authors.forEach((author) => {
+      const handle = extractGitHubHandle(author);
+      const normalizedName = normalizeAuthorName(author);
+
+      if (handle) {
+        if (!handleMap.has(handle)) {
+          handleMap.set(handle, []);
+        }
+        handleMap.get(handle)!.push(author);
+      } else {
+        if (!nameMap.has(normalizedName)) {
+          nameMap.set(normalizedName, []);
+        }
+        nameMap.get(normalizedName)!.push(author);
+      }
+    });
+
+    handleMap.forEach((names) => {
+      const canonical = getCanonicalAuthorName(names);
+      names.forEach((name) => {
+        deduplicationMap.set(name, canonical);
+      });
+    });
+
+    nameMap.forEach((names) => {
+      const canonical = getCanonicalAuthorName(names);
+      names.forEach((name) => {
+        deduplicationMap.set(name, canonical);
+      });
+    });
+
+    return deduplicationMap;
+  }
+
+  // First pass: collect all author names for deduplication
+  const allRawAuthors = new Set<string>();
+  for (const proposal of proposals) {
+    if (proposal.author && proposal.author.trim() !== "" && proposal.author !== "Unknown Author") {
+      const authors = proposal.author
+        .split(",")
+        .map((a) => a.trim())
+        .filter(Boolean);
+      authors.forEach((author) => allRawAuthors.add(author));
+    }
+  }
+
+  // Create deduplication mapping
+  const authorDeduplicationMap = deduplicateAuthors(Array.from(allRawAuthors));
+  console.log(`INFO: Author deduplication for ${protocol}: ${allRawAuthors.size} raw authors → ${new Set(authorDeduplicationMap.values()).size} unique authors`);
+
   console.log(`INFO: Caching ${proposals.length} proposals for protocol: ${protocol}`);
   const pipeline = kv.pipeline();
   const listMetadata = [];
@@ -498,12 +582,24 @@ async function cacheProposalsData(protocol: string, proposals: EipMetadata[]): P
     string,
     {
       totalProposalsInTrack: number;
+      finalizedProposalsInTrack: number;
       allAuthorsInTrack: Set<string>;
       authorsOnFinalizedInTrack: Set<string>;
+      statusCountsInTrack: Record<string, number>;
     }
   > = {};
 
   for (const proposal of proposals) {
+    // Apply author deduplication to the proposal data itself
+    if (proposal.author && proposal.author.trim() !== "" && proposal.author !== "Unknown Author") {
+      const authors = proposal.author
+        .split(",")
+        .map((a) => a.trim())
+        .filter(Boolean);
+      const deduplicatedAuthors = authors.map((author) => authorDeduplicationMap.get(author) || author);
+      proposal.author = deduplicatedAuthors.join(", ");
+    }
+
     // Cache individual proposal
     pipeline.set(`eip:${protocol}:${proposal.number}`, proposal);
 
@@ -522,11 +618,79 @@ async function cacheProposalsData(protocol: string, proposals: EipMetadata[]): P
     }
     if (proposal.category) allCategories.add(proposal.category);
 
-    const authors = (proposal.author || "")
-      .split(",")
-      .map((a) => a.trim())
-      .filter(Boolean);
-    authors.forEach((auth) => allAuthors.add(auth));
+    // Only count authors if we have valid author information
+    const hasValidAuthor = proposal.author && proposal.author.trim() !== "" && proposal.author !== "Unknown Author";
+
+    if (hasValidAuthor) {
+      const authors = (proposal.author || "")
+        .split(",")
+        .map((a) => a.trim())
+        .filter(Boolean)
+        .map((author) => authorDeduplicationMap.get(author) || author); // Apply deduplication
+      authors.forEach((auth) => allAuthors.add(auth));
+
+      const isFinalized = finalizedStatuses.includes(proposal.status);
+      if (isFinalized) {
+        authors.forEach((auth) => authorsOnFinalizedProposals.add(auth));
+
+        let proposalTrack: string | undefined;
+
+        // For Ethereum protocol, use proper EIP categorization
+        if (protocol === "ethereum") {
+          if (proposal.type === "Standards Track" && proposal.category) {
+            // For Standards Track EIPs, use the category (Core, ERC, Networking, Interface)
+            // But normalize ERC to "App" for cross-protocol consistency
+            if (proposal.category === "ERC") {
+              proposalTrack = "App";
+            } else {
+              proposalTrack = proposal.category;
+            }
+          } else {
+            // For Meta and Informational, use the type
+            proposalTrack = proposal.type;
+            // But if we only have a category and it's ERC, normalize to App
+            if (!proposalTrack && proposal.category === "ERC") {
+              proposalTrack = "App";
+            } else if (!proposalTrack && proposal.category) {
+              proposalTrack = proposal.category;
+            }
+          }
+
+          // Additional normalization for any remaining ERC references
+          if (proposalTrack === "ERC") {
+            proposalTrack = "App";
+          }
+        } else {
+          // For other protocols, prioritize type, then category
+          if (proposal.type === "Standards Track") {
+            // For Standards Track proposals, use category if available, otherwise default to "Core"
+            proposalTrack = proposal.category || "Core";
+          } else {
+            proposalTrack = proposal.type;
+            if (!proposalTrack && proposal.category) {
+              proposalTrack = proposal.category;
+            }
+          }
+
+          // Normalize application-level categories to "App"
+          if (proposalTrack && ["ERC", "SRC", "Contracts", "Contract", "Application", "Applications", "RRC", "ARC"].includes(proposalTrack)) {
+            proposalTrack = "App";
+          }
+
+          // Normalize protocol-specific proposal types to "Core"
+          if (proposalTrack && ["RIP", "AIP", "SNIP"].includes(proposalTrack)) {
+            proposalTrack = "Core";
+          }
+        }
+
+        if (proposalTrack) {
+          if (!finalizedContributorsByTrack[proposalTrack]) {
+            finalizedContributorsByTrack[proposalTrack] = new Set<string>();
+          }
+          authors.forEach((auth) => finalizedContributorsByTrack[proposalTrack].add(auth));
+        }
+      }
+    }
 
     if (proposal.sections) {
       proposal.sections.forEach((section) => allSections.add(section));
@@ -538,55 +702,88 @@ async function cacheProposalsData(protocol: string, proposals: EipMetadata[]): P
       yearCounts[year] = (yearCounts[year] || 0) + 1;
     }
 
-    const isFinalized = finalizedStatuses.includes(proposal.status);
-    if (isFinalized) {
-      authors.forEach((auth) => authorsOnFinalizedProposals.add(auth));
-
-      let proposalTrack = proposal.type;
-      if (!proposalTrack && proposal.category) {
-        proposalTrack = proposal.category;
-      } else if (proposalTrack && proposal.category && proposal.type !== proposal.category) {
-        // If both exist and are different, perhaps we should decide on a primary one or handle combined.
-        // For now, prioritizing .type if it exists.
-        // This could be refined if specific protocols have distinct uses for type vs category for finalized stats.
-      }
-
-      if (proposalTrack) {
-        if (!finalizedContributorsByTrack[proposalTrack]) {
-          finalizedContributorsByTrack[proposalTrack] = new Set<string>();
-        }
-        authors.forEach((auth) => finalizedContributorsByTrack[proposalTrack].add(auth));
-      }
-    }
-
     // Logic to determine the primary track for the proposal
-    let proposalTrack = proposal.type; // Prioritize type
-    if (!proposalTrack && proposal.category) {
-      proposalTrack = proposal.category; // Fallback to category
-    } else if (proposalTrack && proposal.category && proposal.type !== proposal.category) {
-      // If both type and category exist and are different, we might concatenate or choose one.
-      // For simplicity, let's assume type is primary if it exists.
-      // Or, a combined key could be: proposalTrack = `${proposal.type} - ${proposal.category}`;
-      // For now, just using type if present, then category.
+    let proposalTrack: string | undefined;
+
+    // For Ethereum protocol, use proper EIP categorization
+    if (protocol === "ethereum") {
+      if (proposal.type === "Standards Track" && proposal.category) {
+        // For Standards Track EIPs, use the category (Core, ERC, Networking, Interface)
+        // But normalize ERC to "App" for cross-protocol consistency
+        if (proposal.category === "ERC") {
+          proposalTrack = "App";
+        } else {
+          proposalTrack = proposal.category;
+        }
+      } else {
+        // For Meta and Informational, use the type
+        proposalTrack = proposal.type;
+        // But if we only have a category and it's ERC, normalize to App
+        if (!proposalTrack && proposal.category === "ERC") {
+          proposalTrack = "App";
+        } else if (!proposalTrack && proposal.category) {
+          proposalTrack = proposal.category;
+        }
+      }
+
+      // Additional normalization for any remaining ERC references
+      if (proposalTrack === "ERC") {
+        proposalTrack = "App";
+      }
+    } else {
+      // For other protocols, prioritize type, then category
+      if (proposal.type === "Standards Track") {
+        // For Standards Track proposals, use category if available, otherwise default to "Core"
+        proposalTrack = proposal.category || "Core";
+      } else {
+        proposalTrack = proposal.type;
+        if (!proposalTrack && proposal.category) {
+          proposalTrack = proposal.category;
+        }
+      }
+
+      // Normalize application-level categories to "App"
+      if (proposalTrack && ["ERC", "SRC", "Contracts", "Contract", "Application", "Applications", "RRC", "ARC"].includes(proposalTrack)) {
+        proposalTrack = "App";
+      }
+
+      // Normalize protocol-specific proposal types to "Core"
+      if (proposalTrack && ["RIP", "AIP", "SNIP"].includes(proposalTrack)) {
+        proposalTrack = "Core";
+      }
     }
 
     if (proposalTrack) {
       if (!tracksBreakdownData[proposalTrack]) {
         tracksBreakdownData[proposalTrack] = {
           totalProposalsInTrack: 0,
+          finalizedProposalsInTrack: 0,
           allAuthorsInTrack: new Set<string>(),
           authorsOnFinalizedInTrack: new Set<string>(),
+          statusCountsInTrack: {},
         };
       }
       tracksBreakdownData[proposalTrack].totalProposalsInTrack++;
-      const currentProposalAuthors = (proposal.author || "")
-        .split(",")
-        .map((a) => a.trim())
-        .filter(Boolean);
-      currentProposalAuthors.forEach((auth) => tracksBreakdownData[proposalTrack].allAuthorsInTrack.add(auth));
 
-      if (finalizedStatuses.includes(proposal.status)) {
-        currentProposalAuthors.forEach((auth) => tracksBreakdownData[proposalTrack].authorsOnFinalizedInTrack.add(auth));
+      // Only count authors if we have valid author information
+      const hasValidAuthor = proposal.author && proposal.author.trim() !== "" && proposal.author !== "Unknown Author";
+
+      if (hasValidAuthor) {
+        const currentProposalAuthors = (proposal.author || "")
+          .split(",")
+          .map((a) => a.trim())
+          .filter(Boolean)
+          .map((author) => authorDeduplicationMap.get(author) || author); // Apply deduplication
+        currentProposalAuthors.forEach((auth) => tracksBreakdownData[proposalTrack].allAuthorsInTrack.add(auth));
+
+        if (finalizedStatuses.includes(proposal.status)) {
+          currentProposalAuthors.forEach((auth) => tracksBreakdownData[proposalTrack].authorsOnFinalizedInTrack.add(auth));
+          tracksBreakdownData[proposalTrack].finalizedProposalsInTrack++;
+        }
+
+        if (proposal.status) {
+          tracksBreakdownData[proposalTrack].statusCountsInTrack[proposal.status] = (tracksBreakdownData[proposalTrack].statusCountsInTrack[proposal.status] || 0) + 1;
+        }
       }
     }
   }
@@ -618,9 +815,11 @@ async function cacheProposalsData(protocol: string, proposals: EipMetadata[]): P
     string,
     {
       totalProposalsInTrack: number;
+      finalizedProposalsInTrack: number;
       distinctAuthorsInTrackCount: number;
       authorsOnFinalizedInTrackCount: number;
       acceptanceScoreForTrack: number;
+      statusCountsInTrack: Record<string, number>;
     }
   > = {};
 
@@ -628,11 +827,16 @@ async function cacheProposalsData(protocol: string, proposals: EipMetadata[]): P
     const trackData = tracksBreakdownData[trackName];
     const distinctAuthorsInTrack = trackData.allAuthorsInTrack.size;
     const authorsOnFinalized = trackData.authorsOnFinalizedInTrack.size;
+    // Calculate proposal-level acceptance rate instead of author-level
+    const proposalAcceptanceRate = trackData.totalProposalsInTrack > 0 ? trackData.finalizedProposalsInTrack / trackData.totalProposalsInTrack : 0;
+
     finalTracksBreakdown[trackName] = {
       totalProposalsInTrack: trackData.totalProposalsInTrack,
+      finalizedProposalsInTrack: trackData.finalizedProposalsInTrack,
       distinctAuthorsInTrackCount: distinctAuthorsInTrack,
       authorsOnFinalizedInTrackCount: authorsOnFinalized,
-      acceptanceScoreForTrack: distinctAuthorsInTrack > 0 ? parseFloat((authorsOnFinalized / distinctAuthorsInTrack).toFixed(2)) : 0,
+      acceptanceScoreForTrack: parseFloat(proposalAcceptanceRate.toFixed(2)),
+      statusCountsInTrack: trackData.statusCountsInTrack,
     };
   }
 
@@ -1018,7 +1222,7 @@ async function processRawFilesToCache(): Promise<void> {
           proposalNumber = extractProposalNumber(filename, repo.proposalPrefix);
         }
 
-        if (proposalNumber && parsedMetadata.title) {
+        if (proposalNumber && parsedMetadata.title && parsedMetadata.type !== "SKIP_THIS_PROPOSAL") {
           processedProposals.push({
             number: proposalNumber,
             title: parsedMetadata.title,

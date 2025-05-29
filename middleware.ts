@@ -46,6 +46,12 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Prevent double-rewriting: if path already starts with a known subdomain, don't rewrite
+  const pathSubdomain = currentPath.split("/")[1];
+  if (PROTOCOL_SUBDOMAINS.includes(pathSubdomain) || pathSubdomain === AUTH_SUBDOMAIN) {
+    return NextResponse.next();
+  }
+
   // Handle subdomain.localhost for local development
   if (hostname.endsWith(".localhost")) {
     const parts = hostname.split(".");
@@ -53,8 +59,10 @@ export function middleware(request: NextRequest) {
       // e.g., ethereum.localhost
       const subdomain = parts[0];
       if (PROTOCOL_SUBDOMAINS.includes(subdomain) || subdomain === AUTH_SUBDOMAIN) {
-        url.pathname = `/${subdomain}${currentPath}`;
-        // console.log(`Middleware: Rewriting ${hostname}${request.nextUrl.pathname} to ${url.pathname}`);
+        // Preserve query parameters and ensure proper path structure
+        const newPath = currentPath === "/" ? `/${subdomain}` : `/${subdomain}${currentPath}`;
+        url.pathname = newPath;
+        // console.log(`Middleware: Rewriting ${hostname}${request.nextUrl.pathname}${request.nextUrl.search} to ${url.pathname}${url.search}`);
         return NextResponse.rewrite(url);
       }
     }
@@ -62,8 +70,10 @@ export function middleware(request: NextRequest) {
     // Handle actual subdomains like ethereum.dip.box
     const subdomain = hostname.replace(`.${MAIN_DOMAIN}`, "");
     if (PROTOCOL_SUBDOMAINS.includes(subdomain) || subdomain === AUTH_SUBDOMAIN) {
-      url.pathname = `/${subdomain}${currentPath}`;
-      // console.log(`Middleware: Rewriting ${hostname}${request.nextUrl.pathname} to ${url.pathname}`);
+      // Preserve query parameters and ensure proper path structure
+      const newPath = currentPath === "/" ? `/${subdomain}` : `/${subdomain}${currentPath}`;
+      url.pathname = newPath;
+      // console.log(`Middleware: Rewriting ${hostname}${request.nextUrl.pathname}${request.nextUrl.search} to ${url.pathname}${url.search}`);
       return NextResponse.rewrite(url);
     }
   }
