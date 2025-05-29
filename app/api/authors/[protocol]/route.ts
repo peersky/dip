@@ -13,9 +13,13 @@ interface AuthorStats {
   lastProposal: string;
 }
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ protocol: string }> }) {
+interface RouteContext {
+  params: Promise<{ protocol: string }>;
+}
+
+export async function GET(request: NextRequest, context: RouteContext) {
   try {
-    const { protocol } = await params;
+    const { protocol } = await context.params;
 
     if (!protocol) {
       return NextResponse.json({ success: false, error: "Protocol parameter is required" }, { status: 400 });
@@ -152,7 +156,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       {
         success: false,
         error: error.message || "Internal server error",
-        protocol: (await params).protocol,
+        protocol: (await context.params).protocol,
       },
       { status: 500 }
     );

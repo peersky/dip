@@ -3,8 +3,12 @@ import { kv } from "@vercel/kv";
 
 export const dynamic = "force-dynamic"; // Ensure fresh data on each request for now
 
-export async function GET(request: NextRequest, { params }: { params: { protocol: string } }) {
-  const protocol = (await params).protocol;
+interface RouteContext {
+  params: Promise<{ protocol: string }>;
+}
+
+export async function GET(request: NextRequest, context: RouteContext) {
+  const { protocol } = await context.params;
 
   if (!protocol) {
     return NextResponse.json({ success: false, error: "Protocol parameter is required" }, { status: 400 });
