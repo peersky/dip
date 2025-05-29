@@ -41,12 +41,12 @@ function TrackSubtable({ stats, isLoading, protocolSubdomain }: {
 
   // Helper to generate track URL
   const getTrackUrl = (trackName: string) => {
-    return `http${process.env.NODE_ENV === 'development' ? '' : 's'}://${protocolSubdomain}.${process.env.NEXT_PUBLIC_BASE_URL || (process.env.NODE_ENV === "development" ? "localhost:3000" : "dip.box")}?track=${encodeURIComponent(trackName)}`;
+    return `${getProtocolUrl(protocolSubdomain)}?track=${encodeURIComponent(trackName)}`;
   };
 
   // Helper to generate status+track filter URL
   const getStatusTrackUrl = (status: string, trackName: string) => {
-    return `http${process.env.NODE_ENV === 'development' ? '' : 's'}://${protocolSubdomain}.${process.env.NEXT_PUBLIC_BASE_URL || (process.env.NODE_ENV === "development" ? "localhost:3000" : "dip.box")}?status=${encodeURIComponent(status)}&track=${encodeURIComponent(trackName)}`;
+    return `${getProtocolUrl(protocolSubdomain)}?status=${encodeURIComponent(status)}&track=${encodeURIComponent(trackName)}`;
   };
 
   return (
