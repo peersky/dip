@@ -119,17 +119,15 @@ export function GitHubAuth({ onAuthChange }: GitHubAuthProps) {
     // GitHub App configuration
     const appName = process.env.NEXT_PUBLIC_GITHUB_APP_NAME || 'improvement-proposals-bot';
 
-    // Smart domain handling for development vs production
-    let authDomain: string;
+    // Always use the centralized auth domain for the callback
+    const authDomain = process.env.NEXT_PUBLIC_AUTH_DOMAIN || 'auth.dip.box';
     let redirectUri: string;
 
-    if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
-      // Development: use localhost
-      authDomain = 'localhost:3000';
-      redirectUri = `http://${authDomain}/auth/github/app/callback`;
+    if (process.env.NODE_ENV === 'development') {
+      // Development: use localhost for the auth domain
+      redirectUri = `http://localhost:3000/auth/github/app/callback`;
     } else {
-      // Production: use current domain for preview/production
-      authDomain = window.location.hostname;
+      // Production: use the centralized auth domain
       redirectUri = `https://${authDomain}/auth/github/app/callback`;
     }
 
@@ -143,10 +141,11 @@ export function GitHubAuth({ onAuthChange }: GitHubAuthProps) {
       return;
     }
 
-    // GitHub App installation URL - this will automatically detect existing installations
-    const installUrl = `https://github.com/apps/${appName}/installations/new`;
+    // GitHub App installation URL with proper redirect_uri
+    const installUrl = `https://github.com/apps/${appName}/installations/new?state=${encodeURIComponent(originalDomain)}`;
 
     console.log('🔗 Opening GitHub App installation:', installUrl);
+    console.log('📍 Callback will redirect to:', redirectUri);
 
     // Open GitHub App installation in popup
     const popup = window.open(installUrl, 'github-install', 'width=800,height=700');
@@ -164,9 +163,19 @@ export function GitHubAuth({ onAuthChange }: GitHubAuthProps) {
       }
     }, 1000);
 
-    // Listen for messages from the popup
+    // Listen for messages from the popup (including cross-domain messages)
     const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
+      // Allow messages from the auth domain or localhost
+      const allowedOrigins = [
+        window.location.origin,
+        `https://${authDomain}`,
+        'http://localhost:3000'
+      ];
+
+      if (!allowedOrigins.includes(event.origin)) {
+        console.warn('Message from unauthorized origin:', event.origin);
+        return;
+      }
 
       if (event.data.type === 'github-installation-complete') {
         clearInterval(checkClosed);
@@ -183,15 +192,43 @@ export function GitHubAuth({ onAuthChange }: GitHubAuthProps) {
         if (event.data.user) {
           localStorage.setItem('github_user_data', JSON.stringify(event.data.user));
           setStoredUsername(event.data.user.login);
+          setUser(event.data.user);
+        }
+        if (event.data.installation) {
+          setInstallation(event.data.installation);
+          setIsInstalled(true);
         }
 
-        // Refetch installations
-        refetchInstallations();
+        // Immediately notify parent component
+        if (event.data.installationId && event.data.user) {
+          onAuthChange(event.data.installationId, event.data.user);
+        }
+
+        // Refetch installations for consistency
+        setTimeout(() => {
+          refetchInstallations();
+        }, 500);
       }
     };
 
     window.addEventListener('message', handleMessage);
-  }, [refetchInstallations]);
+
+    // Cleanup function to remove event listener if component unmounts
+    const cleanup = () => {
+      clearInterval(checkClosed);
+      window.removeEventListener('message', handleMessage);
+      setLoading(false);
+    };
+
+    // Set a timeout to cleanup if popup is still open after 10 minutes
+    const timeoutId = setTimeout(cleanup, 10 * 60 * 1000);
+
+    // Return cleanup function
+    return () => {
+      clearTimeout(timeoutId);
+      cleanup();
+    };
+  }, [refetchInstallations, onAuthChange]);
 
   const handleManageInstallation = useCallback(() => {
     const appName = process.env.NEXT_PUBLIC_GITHUB_APP_NAME || 'improvement-proposals-bot';

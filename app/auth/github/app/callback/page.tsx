@@ -16,30 +16,95 @@ function GitHubAppCallbackContent() {
   useEffect(() => {
     const code = searchParams.get('code');
     const setupAction = searchParams.get('setup_action');
+    const newInstallationId = searchParams.get('installation_id');
 
-    if (setupAction === 'install') {
-      const newInstallationId = searchParams.get('installation_id');
-      if (newInstallationId) {
-        setInstallationId(newInstallationId);
-        setStatus('success');
-        // Optionally, redirect to a setup complete page or main app page
-        // router.push(`/auth/github/app/setup?installation_id=${newInstallationId}`);
+    console.log('GitHub App callback params:', { code, setupAction, newInstallationId });
+
+    const processInstallation = async () => {
+      if (setupAction === 'install' && newInstallationId) {
+        try {
+          setInstallationId(newInstallationId);
+
+          // Fetch installation details to get user info
+          const response = await fetch('/api/auth/github/app/installation', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ installationId: newInstallationId }),
+          });
+
+          const data = await response.json();
+
+          if (response.ok && data.installation && data.user) {
+            setStatus('success');
+
+            // Store installation data
+            localStorage.setItem('github_installation_id', newInstallationId);
+            localStorage.setItem('github_user_data', JSON.stringify(data.user));
+
+            // Notify parent window if this is a popup
+            if (window.opener) {
+              console.log('Sending installation complete message to parent window');
+
+              // Get the original domain from localStorage or URL state
+              const returnDomain = localStorage.getItem('github_auth_return_domain') ||
+                                 searchParams.get('state') ||
+                                 'dip.box';
+
+              // Determine the target origin for the parent window
+              let targetOrigin = window.location.origin; // Default to same origin
+
+              // If we have a return domain and it's different from current domain
+              if (returnDomain && returnDomain !== window.location.hostname) {
+                if (returnDomain === 'localhost' || returnDomain.includes('localhost')) {
+                  targetOrigin = 'http://localhost:3000';
+                } else {
+                  targetOrigin = `https://${returnDomain}`;
+                }
+              }
+
+              console.log('Sending message to target origin:', targetOrigin);
+
+              window.opener.postMessage({
+                type: 'github-installation-complete',
+                installationId: newInstallationId,
+                user: data.user,
+                installation: data.installation
+              }, targetOrigin);
+
+              // Close popup after a short delay
+              setTimeout(() => {
+                window.close();
+              }, 1500);
+            } else {
+              // Not a popup, redirect to setup page after a delay
+              setTimeout(() => {
+                router.push(`/auth/github/app/setup?installation_id=${newInstallationId}`);
+              }, 2000);
+            }
+          } else {
+            setErrorDetails(`Failed to fetch installation details: ${data.error || 'Unknown error'}`);
+            setStatus('error');
+          }
+        } catch (error) {
+          console.error('Error processing installation:', error);
+          setErrorDetails(`Failed to process installation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          setStatus('error');
+        }
+      } else if (code) {
+        // This part would typically handle the OAuth flow for user authentication,
+        // not GitHub App installation. For app installation, the installation_id is key.
+        console.warn('Received OAuth code on app installation callback. This might be unexpected.', { code });
+        setErrorDetails('Unexpected callback state. If you were installing the app, please ensure the process completed correctly.');
+        setStatus('error');
       } else {
-        setErrorDetails('Installation ID not found after successful installation.');
+        setErrorDetails('No installation ID or authorization code found in the callback.');
         setStatus('error');
       }
-    } else if (code) {
-      // This part would typically handle the OAuth flow for user authentication,
-      // not GitHub App installation. For app installation, the installation_id is key.
-      // If this page is solely for app installation callback, this branch might be less relevant.
-      // For now, let's assume if 'code' is present without 'setup_action=install', it's an unexpected state.
-      console.warn('Received OAuth code on app installation callback. This might be unexpected.', { code });
-      setErrorDetails('Unexpected callback state. If you were installing the app, please ensure the process completed correctly.');
-      setStatus('error');
-    } else {
-      setErrorDetails('No installation ID or authorization code found in the callback.');
-      setStatus('error');
-    }
+    };
+
+    processInstallation();
   }, [searchParams, router]);
 
   const handleContinue = () => {
@@ -67,16 +132,23 @@ function GitHubAppCallbackContent() {
         {status === 'success' && (
           <Alert icon={<IconCheck size="1.5rem" />} title="GitHub App Installation Successful!" color="green" w="100%">
             <Text>
-              The GitHub App has been successfully installed or configured.
+              The GitHub App has been successfully installed and configured.
               {installationId && ` Your Installation ID is: ${installationId}`}
             </Text>
-            <Button
-              mt="md"
-              onClick={handleContinue}
-              rightSection={<IconArrowRight size="1rem" />}
-            >
-              Continue to Setup
-            </Button>
+            {!window.opener && (
+              <Button
+                mt="md"
+                onClick={handleContinue}
+                rightSection={<IconArrowRight size="1rem" />}
+              >
+                Continue to Setup
+              </Button>
+            )}
+            {window.opener && (
+              <Text mt="md" size="sm" c="dimmed">
+                This window will close automatically...
+              </Text>
+            )}
           </Alert>
         )}
 

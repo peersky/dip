@@ -58,23 +58,45 @@ export function middleware(request: NextRequest) {
     if (parts.length === 2) {
       // e.g., ethereum.localhost
       const subdomain = parts[0];
-      if (PROTOCOL_SUBDOMAINS.includes(subdomain) || subdomain === AUTH_SUBDOMAIN) {
+      if (PROTOCOL_SUBDOMAINS.includes(subdomain)) {
         // Preserve query parameters and ensure proper path structure
         const newPath = currentPath === "/" ? `/${subdomain}` : `/${subdomain}${currentPath}`;
         url.pathname = newPath;
         // console.log(`Middleware: Rewriting ${hostname}${request.nextUrl.pathname}${request.nextUrl.search} to ${url.pathname}${url.search}`);
         return NextResponse.rewrite(url);
+      } else if (subdomain === AUTH_SUBDOMAIN) {
+        // For auth subdomain, don't add prefix if path already starts with /auth/
+        if (currentPath.startsWith("/auth/")) {
+          // Path already has /auth/ prefix, no rewrite needed
+          return NextResponse.next();
+        } else {
+          // Add /auth/ prefix for root or other paths
+          const newPath = currentPath === "/" ? `/${subdomain}` : `/${subdomain}${currentPath}`;
+          url.pathname = newPath;
+          return NextResponse.rewrite(url);
+        }
       }
     }
   } else if (hostname !== MAIN_DOMAIN && hostname.endsWith(`.${MAIN_DOMAIN}`)) {
     // Handle actual subdomains like ethereum.dip.box
     const subdomain = hostname.replace(`.${MAIN_DOMAIN}`, "");
-    if (PROTOCOL_SUBDOMAINS.includes(subdomain) || subdomain === AUTH_SUBDOMAIN) {
+    if (PROTOCOL_SUBDOMAINS.includes(subdomain)) {
       // Preserve query parameters and ensure proper path structure
       const newPath = currentPath === "/" ? `/${subdomain}` : `/${subdomain}${currentPath}`;
       url.pathname = newPath;
       // console.log(`Middleware: Rewriting ${hostname}${request.nextUrl.pathname}${request.nextUrl.search} to ${url.pathname}${url.search}`);
       return NextResponse.rewrite(url);
+    } else if (subdomain === AUTH_SUBDOMAIN) {
+      // For auth subdomain, don't add prefix if path already starts with /auth/
+      if (currentPath.startsWith("/auth/")) {
+        // Path already has /auth/ prefix, no rewrite needed
+        return NextResponse.next();
+      } else {
+        // Add /auth/ prefix for root or other paths
+        const newPath = currentPath === "/" ? `/${subdomain}` : `/${subdomain}${currentPath}`;
+        url.pathname = newPath;
+        return NextResponse.rewrite(url);
+      }
     }
   }
 
