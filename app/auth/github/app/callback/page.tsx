@@ -20,7 +20,8 @@ function GitHubAppCallbackContent() {
 
     console.log('GitHub App callback params:', { code, setupAction, newInstallationId });
 
-    const processInstallation = async () => {
+    const processCallback = async () => {
+      // Handle GitHub App Installation Flow
       if (setupAction === 'install' && newInstallationId) {
         try {
           setInstallationId(newInstallationId);
@@ -92,19 +93,106 @@ function GitHubAppCallbackContent() {
           setErrorDetails(`Failed to process installation: ${error instanceof Error ? error.message : 'Unknown error'}`);
           setStatus('error');
         }
-      } else if (code) {
-        // This part would typically handle the OAuth flow for user authentication,
-        // not GitHub App installation. For app installation, the installation_id is key.
+      }
+      // Handle OAuth Authentication Flow
+      else if (code && !setupAction) {
+        try {
+          console.log('Processing OAuth authentication flow');
+
+          // Exchange code for access token
+          const response = await fetch('/api/auth/github/exchange', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ code }),
+          });
+
+          const data = await response.json();
+
+          if (response.ok && data.access_token) {
+            setStatus('success');
+
+            // Store token and user data
+            localStorage.setItem('github_token', data.access_token);
+            if (data.user) {
+              localStorage.setItem('github_user_data', JSON.stringify(data.user));
+            }
+
+            // Notify parent window if this is a popup
+            if (window.opener) {
+              console.log('Sending OAuth complete message to parent window');
+
+              // Get the original domain from localStorage or URL state
+              const returnDomain = localStorage.getItem('github_auth_return_domain') ||
+                                 searchParams.get('state') ||
+                                 'dip.box';
+
+              // Determine the target origin for the parent window
+              let targetOrigin = window.location.origin;
+
+              if (returnDomain && returnDomain !== window.location.hostname) {
+                if (returnDomain === 'localhost' || returnDomain.includes('localhost')) {
+                  targetOrigin = 'http://localhost:3000';
+                } else {
+                  targetOrigin = `https://${returnDomain}`;
+                }
+              }
+
+              console.log('Sending OAuth message to target origin:', targetOrigin);
+
+              window.opener.postMessage({
+                type: 'github-oauth-complete',
+                token: data.access_token,
+                user: data.user
+              }, targetOrigin);
+
+              // Close popup after a short delay
+              setTimeout(() => {
+                window.close();
+              }, 1500);
+            } else {
+              // Get the original domain to redirect back to
+              const returnDomain = localStorage.getItem('github_auth_return_domain');
+              localStorage.removeItem('github_auth_return_domain');
+
+              // Not a popup, redirect appropriately
+              if (returnDomain && returnDomain !== window.location.hostname) {
+                // Redirect back to original subdomain
+                setTimeout(() => {
+                  window.location.href = `https://${returnDomain}`;
+                }, 2000);
+              } else {
+                // Fallback: redirect to home
+                setTimeout(() => {
+                  window.location.href = '/';
+                }, 2000);
+              }
+            }
+          } else {
+            setErrorDetails(`OAuth authentication failed: ${data.error || 'Unknown error'}`);
+            setStatus('error');
+          }
+        } catch (error) {
+          console.error('Error processing OAuth authentication:', error);
+          setErrorDetails(`Failed to process OAuth authentication: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          setStatus('error');
+        }
+      }
+      // Handle legacy OAuth code case with warning
+      else if (code) {
         console.warn('Received OAuth code on app installation callback. This might be unexpected.', { code });
         setErrorDetails('Unexpected callback state. If you were installing the app, please ensure the process completed correctly.');
         setStatus('error');
-      } else {
+      }
+      // No valid parameters
+      else {
         setErrorDetails('No installation ID or authorization code found in the callback.');
         setStatus('error');
       }
     };
 
-    processInstallation();
+    processCallback();
   }, [searchParams, router]);
 
   const handleContinue = () => {
