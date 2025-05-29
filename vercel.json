@@ -4,14 +4,6 @@
   "devCommand": "pnpm run dev",
   "installCommand": "pnpm install",
   "regions": ["iad1"],
-  "env": {
-    "NODE_ENV": "production"
-  },
-  "build": {
-    "env": {
-      "NODE_ENV": "production"
-    }
-  },
   "crons": [
     {
       "path": "/api/cron/generate-static",
