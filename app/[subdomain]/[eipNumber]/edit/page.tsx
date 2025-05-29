@@ -18,7 +18,7 @@ interface EipFormData {
   type: string;
   category?: string;
   created?: string;
-  requires?: string[];
+  requires?: string;
   abstract?: string;
   motivation?: string;
   specification?: string;
@@ -119,7 +119,6 @@ export default function SubdomainEditEipPage() {
           initialData={initialData}
           isEditing={true}
           eipNumber={eipNumber}
-          protocolConfig={protocolConfig}
         />
       </Stack>
     </Container>
