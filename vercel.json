@@ -14,10 +14,6 @@
   },
   "crons": [
     {
-      "path": "/api/agent",
-      "schedule": "0 0,24 * * *"
-    },
-    {
       "path": "/api/cron/generate-static",
       "schedule": "0 0 * * *"
     }
