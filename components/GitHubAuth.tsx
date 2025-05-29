@@ -134,9 +134,9 @@ export function GitHubAuth({ onAuthChange }: GitHubAuthProps) {
 
     let redirectUri: string;
     if (process.env.NODE_ENV === 'development') {
-      redirectUri = `http://localhost:3000/auth/github/callback`;
+      redirectUri = `http://localhost:3000/auth/github/app/callback`;
     } else {
-      redirectUri = `https://${authDomain}/auth/github/callback`;
+      redirectUri = `https://${authDomain}/auth/github/app/callback`;
     }
 
     // Store the original domain to redirect back after authentication
