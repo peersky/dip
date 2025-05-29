@@ -9,21 +9,10 @@ import {
   listsPlugin,
   quotePlugin,
   thematicBreakPlugin,
-  // imagePlugin, // Removed for now
   linkPlugin,
   tablePlugin,
   codeBlockPlugin,
-  sandpackPlugin,
   codeMirrorPlugin,
-  // Toolbar components - we can add specific ones if needed
-  // DiffSourceToggleWrapper,
-  // UndoRedo,
-  // BoldItalicUnderlineToggles,
-  // CreateLink,
-  // InsertTable,
-  // ListsToggle,
-  // BlockTypeSelect,
-  // InsertThematicBreak,
 } from '@mdxeditor/editor';
 import '@mdxeditor/editor/style.css';
 

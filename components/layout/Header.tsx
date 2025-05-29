@@ -4,7 +4,6 @@ import React from "react";
 import { Burger, Group, Title, Button } from "@mantine/core";
 import { IconHome } from "@tabler/icons-react";
 import { useTenant } from "@/hooks/useTenant";
-import { useRouter } from "next/navigation";
 
 interface HeaderProps {
   opened: boolean;
@@ -13,7 +12,6 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ opened, toggle }) => {
   const { protocolConfig, isLoading } = useTenant();
-  const router = useRouter();
 
   const goToMainPage = () => {
     // Navigate to the main overview page
