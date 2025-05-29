@@ -8,7 +8,7 @@ import dynamic from 'next/dynamic';
 import { formatEipForSubmit, generateEipFilename } from "@/lib/eip-utils";
 import ReactMarkdown from 'react-markdown';
 import type { MDXEditorMethods } from '@mdxeditor/editor';
-import { GitHubAuth } from '@/app/components/GitHubAuth';
+import { GitHubAuth } from '@/components/GitHubAuth';
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner';
 import { ErrorDisplay } from '@/components/shared/ErrorDisplay';
 import { IconCheck, IconX, IconGitPullRequest } from "@tabler/icons-react";
