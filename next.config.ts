@@ -41,6 +41,12 @@ export default {
       );
     }
 
+    // Help with module resolution
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "@": ".",
+    };
+
     // Fixes npm packages that depend on `fs` module
     if (!isServer) {
       // config.node = { fs: 'empty' };
