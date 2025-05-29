@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Octokit as OctokitCore } from "@octokit/core";
 import { restEndpointMethods, RestEndpointMethodTypes } from "@octokit/plugin-rest-endpoint-methods";
-import { throttling, ThrottlingOptions } from "@octokit/plugin-throttling";
+import { throttling } from "@octokit/plugin-throttling";
 import { kv } from "@vercel/kv";
 import matter from "gray-matter";
 
@@ -149,18 +149,18 @@ async function fetchProposalsFromRepository(config: RepositoryConfig): Promise<E
   const octokit = new Octokit({
     auth: process.env.GITHUB_TOKEN,
     throttle: {
-      onRateLimit: (retryAfter: number, options: any, octokitInstance: InstanceType<typeof Octokit>, retryCount: number) => {
-        octokitInstance.log.warn(`Request quota exhausted for request ${options.method} ${options.url}`);
+      onRateLimit: (retryAfter, options, octokit, retryCount) => {
+        octokit.log.warn(`Request quota exhausted for request ${options.method} ${options.url}`);
         if (retryCount < 3) {
-          octokitInstance.log.info(`Retrying after ${retryAfter} seconds!`);
+          octokit.log.info(`Retrying after ${retryAfter} seconds!`);
           return true;
         }
       },
-      onSecondaryRateLimit: (retryAfter: number, options: any, octokitInstance: InstanceType<typeof Octokit>) => {
-        octokitInstance.log.warn(`Secondary rate limit hit for ${options.method} ${options.url}`);
+      onSecondaryRateLimit: (retryAfter, options, octokit) => {
+        octokit.log.warn(`Secondary rate limit hit for ${options.method} ${options.url}`);
         return true;
       },
-    } as ThrottlingOptions,
+    },
   });
 
   try {
