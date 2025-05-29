@@ -2,7 +2,7 @@
 
 import { Container, Text, Stack, Paper, Group, Button, Badge, TextInput, Select, Card, Pagination, Grid, Divider, Skeleton } from "@mantine/core";
 import { getProtocolConfig } from "@/lib/subdomain-utils";
-import { IconSearch, IconFilter, IconEye, IconCalendar, IconUser, IconArrowLeft } from "@tabler/icons-react";
+import { IconSearch, IconFilter, IconEye, IconCalendar, IconUser, IconArrowLeft, IconPlus } from "@tabler/icons-react";
 import { useState, useEffect, useMemo } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
@@ -138,10 +138,10 @@ export default function SubdomainProtocolPage() {
             </Text> */}
           </div>
           <Button
-            leftSection={<IconArrowLeft size="1rem" />}
-            onClick={() => router.push('/')}
+            leftSection={<IconPlus size="1rem" />}
+            onClick={() => router.push(`./new`)}
           >
-            Back to Home
+            New proposal
           </Button>
         </Group>
 
