@@ -18,8 +18,8 @@ export const Header: React.FC<HeaderProps> = ({ opened, toggle }) => {
   const goToMainPage = () => {
     // Navigate to the main overview page
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || (process.env.NODE_ENV === "development" ? "localhost:3000" : "dip.box");
-    const protocol = process.env.NODE_ENV === "development" ? "http" : "https";
-    window.location.href = `${protocol}://${baseUrl}`;
+    const protocol = process.env.NODE_ENV === "development" ? "http://" : "";
+    window.location.href = `${baseUrl}`;
   };
 
   if (isLoading) {

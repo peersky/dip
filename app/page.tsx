@@ -17,7 +17,7 @@ interface EnrichedProtocol extends ReturnType<typeof getProtocolConfig> {
 // Helper to generate protocol URL
 const getProtocolUrl = (subdomain: string) => {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || (process.env.NODE_ENV === "development" ? "localhost:3000" : "dip.box");
-  return `http${baseUrl.startsWith('localhost') ? '' : 's'}://${subdomain}.${baseUrl}`;
+  return `${subdomain}.${baseUrl}`;
 };
 
 // Component to render track subtable rows
