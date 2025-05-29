@@ -58,7 +58,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
         .map((a: string) => a.trim())
         .filter(Boolean);
 
-      authors.forEach((author) => {
+      authors.forEach((author: any) => {
         if (!authorMap.has(author)) {
           authorMap.set(author, {
             proposals: [],

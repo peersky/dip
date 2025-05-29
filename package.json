@@ -10,7 +10,12 @@
     "start": "next start",
     "lint": "next lint",
     "nice": "next lint",
-    "dev:tunnel": "concurrently \"npm run dev\" \"ngrok http 3000\""
+    "dev:tunnel": "concurrently \"npm run dev\" \"ngrok http 3000\"",
+    "data:regenerate": "curl -X POST \"http://localhost:3000/api/cron/generate-static\" -H \"Content-Type: application/json\"",
+    "data:collect": "curl -X POST \"http://localhost:3000/api/cron/generate-static?phase=collect\" -H \"Content-Type: application/json\"",
+    "data:process": "curl -X POST \"http://localhost:3000/api/cron/generate-static?phase=process\" -H \"Content-Type: application/json\"",
+    "data:status": "curl \"http://localhost:3000/api/cron/status\" -H \"Content-Type: application/json\"",
+    "data:debug": "curl \"http://localhost:3000/api/debug/env\" -H \"Content-Type: application/json\""
   },
   "dependencies": {
     "@emotion/css": "^11.13.5",

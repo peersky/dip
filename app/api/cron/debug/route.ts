@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
 
     samples.forEach((sample) => {
       if ("frontmatterKeys" in sample) {
-        sample.frontmatterKeys.forEach((key) => {
+        sample.frontmatterKeys?.forEach((key: any) => {
           fieldStats[key] = (fieldStats[key] || 0) + 1;
         });
 

@@ -140,16 +140,6 @@ export function getProtocolConfig(protocol: string) {
       color: "blue",
       subdomain: "arbitrum",
     },
-    polygon: {
-      name: "Polygon",
-      repoOwner: process.env.NEXT_PUBLIC_POLYGON_REPO_OWNER || "polygon",
-      repoName: process.env.NEXT_PUBLIC_POLYGON_REPO_NAME || "PIPs",
-      defaultBranch: process.env.NEXT_PUBLIC_POLYGON_REPO_BRANCH || "main",
-      proposalPrefix: "PIP",
-      description: process.env.NEXT_PUBLIC_POLYGON_REPO_DESCRIPTION || "Polygon Improvement Proposals",
-      color: "blue",
-      subdomain: "polygon",
-    },
     // Add more protocols as needed
   };
 

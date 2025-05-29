@@ -1,7 +1,7 @@
 "use client";
 
 import { Container, Title, Stack, Text } from "@mantine/core";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import EipForm, { EipFormSubmitData } from "@/components/eips/EipForm";
 import { getProtocolConfig } from "@/lib/subdomain-utils";
 import { useMemo, useState, useEffect } from "react";
@@ -33,51 +33,68 @@ interface EipFormData {
 
 export default function SubdomainEditEipPage() {
   const params = useParams();
-  const router = useRouter();
   const subdomain = params.subdomain as string;
   const eipNumber = params.eipNumber as string;
 
   const protocolConfig = useMemo(() => getProtocolConfig(subdomain), [subdomain]);
 
-  const [initialData, setInitialData] = useState<EipFormData | undefined>(undefined);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [initialData, setInitialData] = useState<EipFormData | null>(null);
 
   useEffect(() => {
-    if (!subdomain || !eipNumber) return;
-
     const fetchEipData = async () => {
-      setIsLoading(true);
-      setError(null);
+      if (!eipNumber || eipNumber === 'new') return;
+
       try {
+        setLoading(true);
         const response = await fetch(`/api/eips/${subdomain}/${eipNumber}`);
-        const result = await response.json();
-        if (result.success && result.data) {
-          const fetchedEip = result.data;
-          setInitialData({
-            eip: fetchedEip.number,
-            title: fetchedEip.title,
-            description: fetchedEip.description,
-            author: fetchedEip.author,
-            status: fetchedEip.status,
-            type: fetchedEip.type,
-            category: fetchedEip.category,
-            created: fetchedEip.created,
-            discussionsTo: fetchedEip.discussionsTo,
-            requires: fetchedEip.requires,
-            content: fetchedEip.content,
-          });
-        } else {
-          throw new Error(result.error || `Failed to fetch ${protocolConfig.proposalPrefix} ${eipNumber} data.`);
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch EIP data');
         }
-      } catch (err: any) {
-        setError(err.message);
+
+        const result = await response.json();
+
+        if (result.success && result.data) {
+          const eip = result.data;
+
+          // Transform the EIP data to match our form structure
+          const formData: EipFormData = {
+            eip: eip.eip?.toString(),
+            title: eip.title || '',
+            description: eip.description || '',
+            author: Array.isArray(eip.author) ? eip.author.join(', ') : (eip.author || ''),
+            discussionsTo: eip.discussionsTo || eip['discussions-to'] || '',
+            status: eip.status || 'Draft',
+            type: eip.type || '',
+            category: eip.category || '',
+            created: eip.created || '',
+            requires: Array.isArray(eip.requires) ? eip.requires.join(', ') : (eip.requires || ''),
+            abstract: eip.abstract || '',
+            motivation: eip.motivation || '',
+            specification: eip.specification || '',
+            rationale: eip.rationale || '',
+            backwardsCompatibility: eip.backwardsCompatibility || eip['backwards-compatibility'] || '',
+            testCases: eip.testCases || eip['test-cases'] || '',
+            referenceImplementation: eip.referenceImplementation || eip['reference-implementation'] || '',
+            securityConsiderations: eip.securityConsiderations || eip['security-considerations'] || '',
+            copyright: eip.copyright || '',
+            content: eip.content || ''
+          };
+
+          setInitialData(formData);
+        }
+      } catch (err: unknown) {
+        console.error('Error fetching EIP:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load EIP data');
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
+
     fetchEipData();
-  }, [subdomain, eipNumber, protocolConfig.proposalPrefix]);
+  }, [subdomain, eipNumber]);
 
   const handleSubmit = async (data: { rawSubmitData: EipFormSubmitData, fullMarkdown: string, filename: string }) => {
     console.log(`Submitting update for ${protocolConfig.proposalPrefix}-${eipNumber} in ${subdomain}:`, data.rawSubmitData);
@@ -98,7 +115,7 @@ export default function SubdomainEditEipPage() {
     );
   }
 
-  if (isLoading) {
+  if (loading) {
     return <Container size="lg" py="xl"><LoadingSpinner message={`Loading ${protocolConfig.proposalPrefix}-${eipNumber} data for editing...`} /></Container>;
   }
 

@@ -2,7 +2,7 @@
 
 import { Container, Title, Text, Stack, Box, Table, Anchor, Group, Skeleton, Center, Select, TextInput } from "@mantine/core";
 import { IconSearch, IconExternalLink } from "@tabler/icons-react";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
@@ -23,7 +23,8 @@ interface ProtocolAuthorData {
   authors: AuthorStats[];
 }
 
-export default function AuthorsPage() {
+
+function AuthorsContent() {
   const searchParams = useSearchParams();
   const [authorData, setAuthorData] = useState<ProtocolAuthorData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -319,3 +320,32 @@ export default function AuthorsPage() {
     </Container>
   );
 }
+
+
+function AuthorsPageFallback() {
+    return (
+      <Container size="xl" py="xl">
+        <Stack gap="xl">
+          <Box ta="center">
+            <Title order={1} size="h1" mb="md">
+              Author Statistics & Rankings
+            </Title>
+            <Text size="lg" c="dimmed" maw={700} mx="auto">
+              Loading author statistics...
+            </Text>
+          </Box>
+          <Center>
+            <Skeleton height={400} />
+          </Center>
+        </Stack>
+      </Container>
+    );
+  }
+
+  export default function AuthorsPage() {
+    return (
+      <Suspense fallback={<AuthorsPageFallback />}>
+        <AuthorsContent />
+      </Suspense>
+    );
+  }

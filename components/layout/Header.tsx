@@ -34,10 +34,10 @@ export const Header: React.FC<HeaderProps> = ({ opened, toggle }) => {
   return (
     <Group h="100%" px="md" justify="space-between">
       <Group>
-        <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
-        <Title order={3}>
-          {protocolConfig.name} Improvements
-        </Title>
+      <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+      <Title order={3}>
+        {protocolConfig.name} Improvements
+      </Title>
       </Group>
       <Button
         variant="light"

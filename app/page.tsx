@@ -6,7 +6,6 @@ import { ProtocolStatistics, useAllProtocolsStats } from "@/hooks/useProtocolSta
 import { IconArrowUp, IconArrowDown, IconExternalLink, IconChevronDown, IconChevronRight } from "@tabler/icons-react";
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 
 interface EnrichedProtocol extends ReturnType<typeof getProtocolConfig> {
   stats?: ProtocolStatistics;

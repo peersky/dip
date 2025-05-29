@@ -40,14 +40,6 @@ NEXT_PUBLIC_ARBITRUM_REPO_BRANCH=main
 NEXT_PUBLIC_ARBITRUM_REPO_DESCRIPTION="Arbitrum Improvement Proposals"
 ```
 
-### Polygon PIPs (Optional)
-```bash
-NEXT_PUBLIC_POLYGON_REPO_OWNER=polygon
-NEXT_PUBLIC_POLYGON_REPO_NAME=PIPs
-NEXT_PUBLIC_POLYGON_REPO_BRANCH=main
-NEXT_PUBLIC_POLYGON_REPO_DESCRIPTION="Polygon Improvement Proposals"
-```
-
 ## **Currently Used (Existing Project)**
 
 ### Privy Authentication
@@ -118,3 +110,5 @@ NEXT_PUBLIC_ETHEREUM_REPO_DESCRIPTION="Ethereum Improvement Proposals"
 5. **App creates PR** from user's fork → ethereum/EIPs
 
 **No permission needed from Ethereum organization!** ✅
+
+## Google AI (Optional)

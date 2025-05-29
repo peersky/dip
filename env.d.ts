@@ -23,9 +23,7 @@ declare namespace NodeJS {
     NEXT_PUBLIC_ARBITRUM_REPO_BRANCH?: string;
     NEXT_PUBLIC_ARBITRUM_REPO_DESCRIPTION?: string;
 
-    NEXT_PUBLIC_POLYGON_REPO_OWNER?: string;
-    NEXT_PUBLIC_POLYGON_REPO_NAME?: string;
-    NEXT_PUBLIC_POLYGON_REPO_BRANCH?: string;
-    NEXT_PUBLIC_POLYGON_REPO_DESCRIPTION?: string;
+    // Google AI
+    GOOGLE_AI_API_KEY?: string;
   }
 }

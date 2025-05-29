@@ -5,7 +5,7 @@ import { getTenantInfo } from "./lib/subdomain-utils";
 // This should ideally be sourced from the same place as getProtocolConfig if possible,
 // or kept in sync.
 const MAIN_DOMAIN = process.env.NEXT_PUBLIC_BASE_URL ? new URL(process.env.NEXT_PUBLIC_BASE_URL).hostname.replace(/^www\./, "") : "dip.box";
-const PROTOCOL_SUBDOMAINS = ["ethereum", "rollup", "starknet", "arbitrum", "polygon"]; // Add other protocol subdomains here
+const PROTOCOL_SUBDOMAINS = ["ethereum", "rollup", "starknet", "arbitrum"]; // Add other protocol subdomains here
 const AUTH_SUBDOMAIN = "auth";
 
 // Separate page and API endpoints for clearer management
