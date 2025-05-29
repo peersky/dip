@@ -6,8 +6,8 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const protocol = searchParams.get('protocol') || 'ethereum';
-  const limit = parseInt(searchParams.get('limit') || '10');
+  const protocol = searchParams.get("protocol") || "ethereum";
+  const limit = parseInt(searchParams.get("limit") || "10");
 
   try {
     // Get repository
@@ -16,17 +16,20 @@ export async function GET(request: NextRequest) {
     });
 
     if (!repo) {
-      return NextResponse.json({
-        success: false,
-        error: `No repository found for protocol: ${protocol}`,
-      }, { status: 404 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: `No repository found for protocol: ${protocol}`,
+        },
+        { status: 404 }
+      );
     }
 
     // Get sample raw files
     const rawFiles = await prisma.rawFile.findMany({
       where: { repositoryId: repo.id },
       take: limit,
-      orderBy: { crawledAt: 'desc' },
+      orderBy: { crawledAt: "desc" },
       select: {
         id: true,
         githubPath: true,
@@ -34,7 +37,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const samples = rawFiles.map(file => {
+    const samples = rawFiles.map((file) => {
       try {
         const { data: frontmatter } = matter(file.rawMarkdown);
         const frontmatterKeys = Object.keys(frontmatter);
@@ -61,9 +64,9 @@ export async function GET(request: NextRequest) {
     const typeValues: Record<string, number> = {};
     const categoryValues: Record<string, number> = {};
 
-    samples.forEach(sample => {
-      if ('frontmatterKeys' in sample) {
-        sample.frontmatterKeys.forEach(key => {
+    samples.forEach((sample) => {
+      if ("frontmatterKeys" in sample) {
+        sample.frontmatterKeys?.forEach((key) => {
           fieldStats[key] = (fieldStats[key] || 0) + 1;
         });
 
@@ -82,19 +85,20 @@ export async function GET(request: NextRequest) {
       protocol,
       totalFiles: rawFiles.length,
       fieldStats: Object.entries(fieldStats)
-        .sort(([,a], [,b]) => b - a)
+        .sort(([, a], [, b]) => b - a)
         .slice(0, 20), // Top 20 most common fields
-      typeValues: Object.entries(typeValues)
-        .sort(([,a], [,b]) => b - a),
-      categoryValues: Object.entries(categoryValues)
-        .sort(([,a], [,b]) => b - a),
+      typeValues: Object.entries(typeValues).sort(([, a], [, b]) => b - a),
+      categoryValues: Object.entries(categoryValues).sort(([, a], [, b]) => b - a),
       samples: samples.slice(0, 5), // First 5 samples for detailed inspection
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
-    return NextResponse.json({
-      success: false,
-      error: error.message,
-    }, { status: 500 });
+    return NextResponse.json(
+      {
+        success: false,
+        error: error.message,
+      },
+      { status: 500 }
+    );
   }
 }
