@@ -182,6 +182,37 @@ function ProtocolRow({ protocol, protocolsData, isLoading }: {
   const [expanded, setExpanded] = useState(false);
   const stats = protocolsData[protocol.subdomain];
 
+  // Calculate aggregate metrics from track-level data (mean of track values)
+  const aggregateMetrics = useMemo(() => {
+    if (!stats?.tracksBreakdown) return { acceptanceRate: null, centralizationRate: null };
+
+    const tracks = Object.values(stats.tracksBreakdown);
+    if (tracks.length === 0) return { acceptanceRate: null, centralizationRate: null };
+
+    // Calculate mean acceptance rate across all tracks
+    const trackAcceptanceRates = tracks
+      .filter(track => track.totalProposalsInTrack > 0)
+      .map(track => track.acceptanceScoreForTrack);
+
+    const meanAcceptanceRate = trackAcceptanceRates.length > 0
+      ? trackAcceptanceRates.reduce((sum, rate) => sum + rate, 0) / trackAcceptanceRates.length
+      : 0;
+
+    // Calculate mean centralization rate across all tracks
+    const trackCentralizationRates = tracks
+      .filter(track => track.distinctAuthorsInTrackCount > 0)
+      .map(track => 1 - (track.authorsOnFinalizedInTrackCount / track.distinctAuthorsInTrackCount));
+
+    const meanCentralizationRate = trackCentralizationRates.length > 0
+      ? trackCentralizationRates.reduce((sum, rate) => sum + rate, 0) / trackCentralizationRates.length
+      : 0;
+
+    return {
+      acceptanceRate: meanAcceptanceRate,
+      centralizationRate: meanCentralizationRate
+    };
+  }, [stats?.tracksBreakdown]);
+
   return (
     <>
       <Table.Tr key={protocol.subdomain}>
@@ -235,30 +266,26 @@ function ProtocolRow({ protocol, protocolsData, isLoading }: {
         </Table.Td>
         <Table.Td ta="right">
           {isLoading ? <Skeleton height={16} width={40} /> :
-            (stats && typeof stats.acceptanceScore === 'number' ? (
+            (aggregateMetrics.acceptanceRate !== null ? (
               <Text
-                c={stats.acceptanceScore > 0.3 ? 'green' : 'orange'}
+                c={aggregateMetrics.acceptanceRate > 0.3 ? 'green' : 'orange'}
                 fw={500}
               >
-                {(stats.acceptanceScore * 100).toFixed(0)}%
-          </Text>
+                {(aggregateMetrics.acceptanceRate * 100).toFixed(0)}%
+              </Text>
             ) : 'N/A')
           }
         </Table.Td>
         <Table.Td ta="right">
           {isLoading ? <Skeleton height={16} width={40} /> :
-            (() => {
-              if (!stats?.distinctAuthorsCount || !stats?.authorsOnFinalizedCount) return 'N/A';
-              const centralizationRate = 1 - (stats.authorsOnFinalizedCount / stats.distinctAuthorsCount);
-              return (
-                <Text
-                  c={centralizationRate > 0.5 ? 'red' : centralizationRate > 0.3 ? 'orange' : 'green'}
-                  fw={500}
-                >
-                  {(centralizationRate * 100).toFixed(0)}%
-          </Text>
-              );
-            })()
+            (aggregateMetrics.centralizationRate !== null ? (
+              <Text
+                c={aggregateMetrics.centralizationRate > 0.5 ? 'red' : aggregateMetrics.centralizationRate > 0.3 ? 'orange' : 'green'}
+                fw={500}
+              >
+                {(aggregateMetrics.centralizationRate * 100).toFixed(0)}%
+              </Text>
+            ) : 'N/A')
           }
         </Table.Td>
         <Table.Td ta="right">
@@ -371,8 +398,9 @@ export default function HomePage() {
 
          <Center mt="lg">
             <Text size="sm" c="dimmed" ta="center">
-                Metrics are updated periodically. Acceptance Rate = (Finalized Proposals) / (Total Proposals).
-                Centralization = 1 - (Authors Accepted / Total Authors) where higher % means fewer authors control finalized decisions.
+                Metrics are updated periodically. Acceptance Rate and Centralization are calculated as the mean of track-level values.
+                Acceptance Rate = Average across tracks of (Finalized Proposals / Total Proposals per track).
+                Centralization = Average across tracks of (1 - Authors Accepted / Total Authors per track), where higher % means fewer authors control finalized decisions.
                 Click the arrow icons to expand and view detailed track-level breakdowns for each protocol.
               </Text>
         </Center>

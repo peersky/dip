@@ -160,7 +160,7 @@ export function getProtocolConfig(protocol: string) {
  * Get all available protocols for the main domain
  */
 export function getAllProtocols() {
-  return [getProtocolConfig("ethereum"), getProtocolConfig("rollup"), getProtocolConfig("starknet")];
+  return [getProtocolConfig("ethereum"), getProtocolConfig("rollup"), getProtocolConfig("starknet"), getProtocolConfig("arbitrum")];
 }
 
 /**
