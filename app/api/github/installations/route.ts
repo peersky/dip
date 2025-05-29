@@ -67,7 +67,7 @@ export async function POST(request: Request) {
           const installationOctokit = await app.getInstallationOctokit(installation.id);
           const { data: repositories } = await installationOctokit.rest.apps.listReposAccessibleToInstallation();
 
-          const accountLogin = "login" in installation.account! ? installation.account!.login : "slug" in installation.account! ? installation.account!.slug : "unknown";
+          const accountLogin = "login" in installation.account! ? installation.account!.login : "slug" in installation.account! ? (installation.account as any).slug : "unknown";
 
           return {
             id: installation.id,
