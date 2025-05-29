@@ -42,29 +42,64 @@ function GitHubCallbackContent() {
         if (response.ok && data.access_token) {
           // Store token in localStorage
           localStorage.setItem('github_token', data.access_token);
+
+          // Store user data if provided
+          if (data.user) {
+            localStorage.setItem('github_user_data', JSON.stringify(data.user));
+          }
+
           setStatus('success');
           setMessage('Successfully authenticated with GitHub!');
 
-          // Get the original domain to redirect back to
-          const returnDomain = localStorage.getItem('github_auth_return_domain');
-          localStorage.removeItem('github_auth_return_domain');
-
-          // Close popup window or redirect back to original domain
+          // Notify parent window if this is a popup
           if (window.opener) {
-            // This is a popup window
+            console.log('Sending OAuth complete message to parent window');
+
+            // Get the original domain from localStorage or URL state
+            const returnDomain = localStorage.getItem('github_auth_return_domain') ||
+                               searchParams.get('state') ||
+                               'dip.box';
+
+            // Determine the target origin for the parent window
+            let targetOrigin = window.location.origin;
+
+            if (returnDomain && returnDomain !== window.location.hostname) {
+              if (returnDomain === 'localhost' || returnDomain.includes('localhost')) {
+                targetOrigin = 'http://localhost:3000';
+              } else {
+                targetOrigin = `https://${returnDomain}`;
+              }
+            }
+
+            console.log('Sending OAuth message to target origin:', targetOrigin);
+
+            window.opener.postMessage({
+              type: 'github-oauth-complete',
+              token: data.access_token,
+              user: data.user
+            }, targetOrigin);
+
+            // Close popup after a short delay
             setTimeout(() => {
               window.close();
-            }, 2000);
-          } else if (returnDomain && returnDomain !== window.location.hostname) {
-            // Redirect back to original subdomain
-            setTimeout(() => {
-              window.location.href = `https://${returnDomain}`;
-            }, 2000);
+            }, 1500);
           } else {
-            // Fallback: redirect to home
-            setTimeout(() => {
-              window.location.href = '/';
-            }, 2000);
+            // Get the original domain to redirect back to
+            const returnDomain = localStorage.getItem('github_auth_return_domain');
+            localStorage.removeItem('github_auth_return_domain');
+
+            // Not a popup, redirect appropriately
+            if (returnDomain && returnDomain !== window.location.hostname) {
+              // Redirect back to original subdomain
+              setTimeout(() => {
+                window.location.href = `https://${returnDomain}`;
+              }, 2000);
+            } else {
+              // Fallback: redirect to home
+              setTimeout(() => {
+                window.location.href = '/';
+              }, 2000);
+            }
           }
         } else {
           setStatus('error');

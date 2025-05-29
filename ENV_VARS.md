@@ -7,12 +7,19 @@ This document lists all environment variables used in the DIP Platform.
 ### Required for Production
 ```bash
 # GitHub App credentials (get from https://github.com/settings/apps)
-GITHUB_APP_ID=123456
+GITHUB_APP_ID=1333063
 GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
 NEXT_PUBLIC_GITHUB_APP_NAME=improvement-proposals-bot
 
+# GitHub OAuth credentials (from the same GitHub App page)
+NEXT_PUBLIC_GITHUB_CLIENT_ID=Iv23li5CyuOpYc8pVa8f
+GITHUB_CLIENT_SECRET=your_client_secret_here
+
 # GitHub webhook secret (optional, for webhook verification)
 GITHUB_WEBHOOK_SECRET=your_webhook_secret_here
+
+# Multi-tenant Configuration
+NEXT_PUBLIC_AUTH_DOMAIN=auth.dip.box
 ```
 
 ## **Repository Configuration**

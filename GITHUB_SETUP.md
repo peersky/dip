@@ -68,41 +68,47 @@ Create a `.env.local` file in the frontend directory:
 
 ```bash
 # GitHub App Configuration
-GITHUB_APP_ID=123456
-GITHUB_APP_NAME=dip
+GITHUB_APP_ID=1333063
 GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\nMIIE...your-key-here...\n-----END RSA PRIVATE KEY-----"
-GITHUB_WEBHOOK_SECRET=your_webhook_secret_here
+NEXT_PUBLIC_GITHUB_APP_NAME=improvement-proposals-bot
+
+# GitHub OAuth Configuration (from same app)
+NEXT_PUBLIC_GITHUB_CLIENT_ID=Iv23li5CyuOpYc8pVa8f
+GITHUB_CLIENT_SECRET=your_client_secret_here
 
 # Multi-tenant Configuration
 NEXT_PUBLIC_AUTH_DOMAIN=auth.dip.box
-NEXT_PUBLIC_GITHUB_APP_NAME=improvement-proposals-bot
 
-# Optional: For development
-NEXT_PUBLIC_DEV_MODE=true
+# GitHub webhook secret (optional)
+GITHUB_WEBHOOK_SECRET=your_webhook_secret_here
 ```
 
 **Important Notes:**
-- Replace `123456` with your actual App ID
+- Replace `1333063` with your actual App ID
 - Replace `improvement-proposals-bot` with your actual app name (lowercase, hyphens)
+- Replace `Iv23li5CyuOpYc8pVa8f` with your actual Client ID
 - Convert the private key to a single line with `\n` for newlines
 - Generate webhook secret: `openssl rand -hex 32`
 
 ## How It Works
 
-### User Installation Flow
-1. User clicks "Install GitHub App" in the DIP platform
-2. Redirected to GitHub app installation page
-3. User selects which repositories to grant access to
-4. GitHub redirects back to platform with installation ID
-5. Platform stores installation ID and user info locally
+### Dual Authentication Flow (Security + UX)
+The platform uses **both** GitHub App installation AND OAuth user authentication:
 
-### EIP Submission Flow
-1. User creates EIP using the platform form
-2. Platform uses installation ID to get access token
-3. Platform creates/updates fork of target repository (e.g., ethereum/EIPs)
-4. Platform creates new branch and commits EIP file
-5. Platform creates pull request from user's fork to main repository
-6. PR appears as coming from the actual user (not the platform)
+1. **GitHub App Installation**: Grants repository access permissions
+2. **OAuth Authentication**: Identifies the user securely
+
+This ensures:
+- ✅ **Security**: Only authenticated users can see their own installations
+- ✅ **Privacy**: No cross-user data exposure
+- ✅ **Minimal Permissions**: Users only grant what's needed
+
+### Complete User Flow
+1. **User visits platform** → Sees "Install GitHub App" and "Authenticate" buttons
+2. **User installs GitHub App** → Selects repositories to grant access to
+3. **User authenticates via OAuth** → Platform can identify them securely
+4. **Platform matches user to their installations** → Shows only their data
+5. **User can submit EIPs** → Creates PRs using their authenticated identity
 
 ### Benefits
 
