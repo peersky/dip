@@ -130,20 +130,10 @@ export function getProtocolConfig(protocol: string) {
       color: "blue",
       subdomain: "starknet",
     },
-    arbitrum: {
-      name: "Arbitrum",
-      repoOwner: process.env.NEXT_PUBLIC_ARBITRUM_REPO_OWNER || "arbitrum-foundation",
-      repoName: process.env.NEXT_PUBLIC_ARBITRUM_REPO_NAME || "AIPs",
-      defaultBranch: process.env.NEXT_PUBLIC_ARBITRUM_REPO_BRANCH || "main",
-      proposalPrefix: "AIP",
-      description: process.env.NEXT_PUBLIC_ARBITRUM_REPO_DESCRIPTION || "Arbitrum Improvement Proposals",
-      color: "blue",
-      subdomain: "arbitrum",
-    },
     polygon: {
       name: "Polygon",
-      repoOwner: process.env.NEXT_PUBLIC_POLYGON_REPO_OWNER || "polygon",
-      repoName: process.env.NEXT_PUBLIC_POLYGON_REPO_NAME || "PIPs",
+      repoOwner: process.env.NEXT_PUBLIC_POLYGON_REPO_OWNER || "maticnetwork",
+      repoName: process.env.NEXT_PUBLIC_POLYGON_REPO_NAME || "Polygon-Improvement-Proposals",
       defaultBranch: process.env.NEXT_PUBLIC_POLYGON_REPO_BRANCH || "main",
       proposalPrefix: "PIP",
       description: process.env.NEXT_PUBLIC_POLYGON_REPO_DESCRIPTION || "Polygon Improvement Proposals",
@@ -160,7 +150,7 @@ export function getProtocolConfig(protocol: string) {
  * Get all available protocols for the main domain
  */
 export function getAllProtocols() {
-  return [getProtocolConfig("ethereum"), getProtocolConfig("rollup"), getProtocolConfig("starknet"), getProtocolConfig("arbitrum")];
+  return [getProtocolConfig("ethereum"), getProtocolConfig("rollup"), getProtocolConfig("starknet"), getProtocolConfig("polygon")];
 }
 
 /**

@@ -156,7 +156,7 @@ export async function GET(request: NextRequest) {
           }
 
           // Normalize protocol-specific proposal types to "Core"
-          if (eipTrack && ["RIP", "AIP", "SNIP"].includes(eipTrack)) {
+          if (eipTrack && ["RIP", "AIP", "SNIP", "PIP"].includes(eipTrack)) {
             eipTrack = "Core";
           }
         }

@@ -110,7 +110,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
           }
 
           // Normalize protocol-specific proposal types to "Core"
-          if (track && ["RIP", "AIP", "SNIP"].includes(track)) {
+          if (track && ["RIP", "AIP", "SNIP", "PIP"].includes(track)) {
             track = "Core";
           }
         }

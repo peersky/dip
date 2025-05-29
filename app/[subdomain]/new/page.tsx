@@ -4,7 +4,7 @@ import { Container, Title, Stack, Alert, Group, Button, Text } from "@mantine/co
 import EipForm, { EipFormSubmitData } from "@/components/eips/EipForm";
 import { notifications } from "@mantine/notifications";
 import { useState, useMemo } from "react";
-import { IconCheck, IconGitPullRequest, IconExternalLink } from "@tabler/icons-react";
+import { IconCheck, IconExternalLink } from "@tabler/icons-react";
 import { getProtocolConfig } from "@/lib/subdomain-utils";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { ErrorDisplay } from "@/components/shared/ErrorDisplay";
@@ -16,7 +16,7 @@ interface SubmissionData {
   fullMarkdown: string;
   filename: string;
   githubInstallationId?: string | null;
-  githubUser?: any;
+  githubUser?: unknown;
 }
 
 export default function SubdomainNewEipPage() {
@@ -88,12 +88,13 @@ export default function SubdomainNewEipPage() {
       } else {
         throw new Error(result.error || "Failed to create pull request");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
       console.error("Failed to submit EIP for PR creation:", error);
-      setSubmissionError(error.message || "Could not connect to the server to create PR.");
+      setSubmissionError(errorMessage || "Could not connect to the server to create PR.");
       notifications.show({
         title: "Submission Failed",
-        message: error.message || "An error occurred while creating the pull request.",
+        message: errorMessage || "An error occurred while creating the pull request.",
         color: 'red',
         autoClose: 7000,
       });
