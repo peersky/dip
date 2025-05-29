@@ -7,7 +7,6 @@ import "./globals.css"; // Assuming this contains basic global styles
 import "@mantine/core/styles.css";
 import { Notifications } from "@mantine/notifications";
 import "@mantine/notifications/styles.css";
-import "@mantine/tiptap/styles.css";
 import { Header } from "@/components/layout/Header";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
