@@ -18,11 +18,35 @@ interface AuthorStats {
   lastProposal: string;
 }
 
+interface AuthorWithProtocolData {
+  name: string;
+  protocolsParticipated: string[];
+  firstProposal: string;
+  lastProposal: string;
+  total: {
+    totalProposals: number;
+    finalizedProposals: number;
+    acceptanceRate: number;
+    influenceScore: number;
+    primaryTrack: string;
+  };
+  protocols: {
+    [key: string]: {
+      totalProposals: number;
+      finalizedProposals: number;
+      acceptanceRate: number;
+      influenceScore: number;
+      primaryTrack: string;
+      trackDistribution: Record<string, number>;
+    } | null;
+  };
+}
+
 interface ProtocolAuthorData {
   protocol: string;
   authors: AuthorStats[];
+  totalFinalizedProposals: number;
 }
-
 
 function AuthorsContent() {
   const searchParams = useSearchParams();
@@ -46,18 +70,12 @@ function AuthorsContent() {
     setStatusFilter(status);
   }, [searchParams]);
 
-  // Debug: Log filter changes
-  useEffect(() => {
-    console.log('Filter states updated:', { protocolFilter, trackFilter, statusFilter });
-  }, [protocolFilter, trackFilter, statusFilter]);
-
   // Fetch author data from all protocols
   useEffect(() => {
     const fetchAuthorData = async () => {
       setIsLoading(true);
       const protocols = ['ethereum', 'starknet', 'rollup', 'arbitrum'];
       const data: ProtocolAuthorData[] = [];
-      let totalFinalizedAcrossAllProtocols = 0;
 
       for (const protocol of protocols) {
         try {
@@ -67,10 +85,9 @@ function AuthorsContent() {
             if (result.success) {
               data.push({
                 protocol,
-                authors: result.authors || []
+                authors: result.authors || [],
+                totalFinalizedProposals: result.totalFinalizedProposals || 0
               });
-              // Add to total finalized proposals count
-              totalFinalizedAcrossAllProtocols += result.totalFinalizedProposals || 0;
             }
           }
         } catch (error) {
@@ -78,8 +95,6 @@ function AuthorsContent() {
         }
       }
 
-      // Store total finalized proposals for influence calculation
-      (window as any).totalFinalizedProposals = totalFinalizedAcrossAllProtocols;
       setAuthorData(data);
       setIsLoading(false);
     };
@@ -87,106 +102,149 @@ function AuthorsContent() {
     fetchAuthorData();
   }, []);
 
-  // Aggregate and filter authors
-  const aggregatedAuthors = useMemo(() => {
-    const authorMap = new Map<string, AuthorStats>();
-    const totalFinalizedProposals = (window as any).totalFinalizedProposals || 1; // Prevent division by zero
+  // Aggregate and process authors
+  const processedAuthors = useMemo(() => {
+    if (!authorData.length) return [];
 
-    // Store per-protocol author data for precise filtering
-    const authorProtocolData = new Map<string, Map<string, AuthorStats>>();
+    const authorMap = new Map<string, AuthorWithProtocolData>();
+    const protocolTotals = new Map<string, number>();
 
+    // Calculate protocol totals for influence score calculation
+    authorData.forEach(({ protocol, totalFinalizedProposals }) => {
+      protocolTotals.set(protocol, totalFinalizedProposals);
+    });
+
+    // Calculate global total
+    const globalTotalFinalized = Array.from(protocolTotals.values()).reduce((sum, total) => sum + total, 0);
+
+    // Process each protocol's authors
     authorData.forEach(({ protocol, authors }) => {
+      const protocolTotal = protocolTotals.get(protocol) || 1;
+
       authors.forEach(author => {
-        // Store per-protocol data for precise filtering
-        if (!authorProtocolData.has(author.name)) {
-          authorProtocolData.set(author.name, new Map());
-        }
-        authorProtocolData.get(author.name)!.set(protocol, author);
-
-        // Aggregate across protocols
-        const existing = authorMap.get(author.name);
-        if (existing) {
-          // Merge data across protocols
-          existing.totalProposals += author.totalProposals;
-          existing.finalizedProposals += author.finalizedProposals;
-          existing.protocolsParticipated = [...new Set([...existing.protocolsParticipated, protocol])];
-          Object.entries(author.trackDistribution).forEach(([track, count]) => {
-            existing.trackDistribution[track] = (existing.trackDistribution[track] || 0) + count;
-          });
-          existing.acceptanceRate = existing.totalProposals > 0 ? existing.finalizedProposals / existing.totalProposals : 0;
-          // New influence score: percentage of all finalized proposals
-          existing.influenceScore = totalFinalizedProposals > 0 ?
-            parseFloat(((existing.finalizedProposals / totalFinalizedProposals) * 100).toFixed(2)) : 0;
-        } else {
-          // New influence score: percentage of all finalized proposals
-          const influenceScore = totalFinalizedProposals > 0 ?
-            parseFloat(((author.finalizedProposals / totalFinalizedProposals) * 100).toFixed(2)) : 0;
-
+        if (!authorMap.has(author.name)) {
+          // Initialize author with empty protocol data
           authorMap.set(author.name, {
-            ...author,
-            protocolsParticipated: [protocol],
-            influenceScore
+            name: author.name,
+            protocolsParticipated: [],
+            firstProposal: author.firstProposal,
+            lastProposal: author.lastProposal,
+            total: {
+              totalProposals: 0,
+              finalizedProposals: 0,
+              acceptanceRate: 0,
+              influenceScore: 0,
+              primaryTrack: ''
+            },
+            protocols: {
+              ethereum: null,
+              starknet: null,
+              rollup: null,
+              arbitrum: null
+            }
           });
         }
+
+        const authorEntry = authorMap.get(author.name)!;
+
+        // Add protocol to participated list
+        if (!authorEntry.protocolsParticipated.includes(protocol)) {
+          authorEntry.protocolsParticipated.push(protocol);
+        }
+
+        // Calculate protocol-specific influence score
+        const protocolInfluenceScore = protocolTotal > 0 ?
+          parseFloat(((author.finalizedProposals / protocolTotal) * 100).toFixed(2)) : 0;
+
+        // Get primary track for this protocol
+        const primaryTrack = Object.entries(author.trackDistribution)
+          .sort(([,a], [,b]) => b - a)[0]?.[0] || 'N/A';
+
+        // Set protocol-specific data
+        authorEntry.protocols[protocol] = {
+          totalProposals: author.totalProposals,
+          finalizedProposals: author.finalizedProposals,
+          acceptanceRate: author.acceptanceRate,
+          influenceScore: protocolInfluenceScore,
+          primaryTrack,
+          trackDistribution: author.trackDistribution
+        };
+
+        // Update totals
+        authorEntry.total.totalProposals += author.totalProposals;
+        authorEntry.total.finalizedProposals += author.finalizedProposals;
       });
     });
 
-    // Convert to array and apply filters
-    let filtered = Array.from(authorMap.values());
+    // Calculate total metrics and apply filters
+    let filteredAuthors = Array.from(authorMap.values()).map(author => {
+      // Calculate total acceptance rate
+      author.total.acceptanceRate = author.total.totalProposals > 0 ?
+        author.total.finalizedProposals / author.total.totalProposals : 0;
 
-    console.log('Before filtering:', filtered.length, 'authors');
-    console.log('Applied filters:', { protocolFilter, trackFilter, statusFilter });
+      // Calculate total influence score
+      author.total.influenceScore = globalTotalFinalized > 0 ?
+        parseFloat(((author.total.finalizedProposals / globalTotalFinalized) * 100).toFixed(2)) : 0;
 
-    // Apply protocol-specific filtering when both protocol and track/status are specified
-    if (protocolFilter !== 'all' && (trackFilter !== 'all' || statusFilter === 'finalized')) {
-      filtered = filtered.filter(author => {
-        const protocolData = authorProtocolData.get(author.name)?.get(protocolFilter);
-        if (!protocolData) return false;
-
-        // Check if this author has the required track in the specific protocol
-        if (trackFilter !== 'all' && !protocolData.trackDistribution[trackFilter]) {
-          return false;
+      // Calculate primary track across all protocols
+      const allTracks: Record<string, number> = {};
+      Object.values(author.protocols).forEach(protocolData => {
+        if (protocolData) {
+          Object.entries(protocolData.trackDistribution).forEach(([track, count]) => {
+            allTracks[track] = (allTracks[track] || 0) + count;
+          });
         }
-
-        // Check if this author has finalized proposals in the specific protocol
-        if (statusFilter === 'finalized' && protocolData.finalizedProposals === 0) {
-          return false;
-        }
-
-        return true;
       });
-      console.log('After protocol-specific filter:', filtered.length, 'authors');
-    } else {
-      // Apply simple filters for cross-protocol aggregation
-      if (protocolFilter !== 'all') {
-        filtered = filtered.filter(author => author.protocolsParticipated.includes(protocolFilter));
-        console.log('After protocol filter:', filtered.length, 'authors');
-      }
+      author.total.primaryTrack = Object.entries(allTracks)
+        .sort(([,a], [,b]) => b - a)[0]?.[0] || 'N/A';
 
-      if (trackFilter !== 'all') {
-        filtered = filtered.filter(author => author.trackDistribution[trackFilter] > 0);
-        console.log('After track filter:', filtered.length, 'authors');
-      }
+      return author;
+    });
 
-      if (statusFilter === 'finalized') {
-        filtered = filtered.filter(author => author.finalizedProposals > 0);
-        console.log('After status filter:', filtered.length, 'authors');
-      }
+    // Apply filters
+    if (protocolFilter !== 'all') {
+      filteredAuthors = filteredAuthors.filter(author =>
+        author.protocolsParticipated.includes(protocolFilter)
+      );
+    }
+
+    if (trackFilter !== 'all') {
+      filteredAuthors = filteredAuthors.filter(author =>
+        Object.values(author.protocols).some(protocolData =>
+          protocolData && protocolData.trackDistribution[trackFilter] > 0
+        )
+      );
+    }
+
+    if (statusFilter === 'finalized') {
+      filteredAuthors = filteredAuthors.filter(author => author.total.finalizedProposals > 0);
     }
 
     if (searchTerm) {
-      filtered = filtered.filter(author =>
+      filteredAuthors = filteredAuthors.filter(author =>
         author.name.toLowerCase().includes(searchTerm.toLowerCase())
       );
-      console.log('After search filter:', filtered.length, 'authors');
     }
 
-    // Sort by influence score
-    return filtered.sort((a, b) => b.influenceScore - a.influenceScore);
+    // Sort by total influence score, but if filtering by specific protocol, sort by that protocol's influence score
+    if (protocolFilter !== 'all') {
+      return filteredAuthors.sort((a, b) => {
+        const aScore = a.protocols[protocolFilter]?.influenceScore || 0;
+        const bScore = b.protocols[protocolFilter]?.influenceScore || 0;
+        return bScore - aScore;
+      });
+    }
+
+    return filteredAuthors.sort((a, b) => b.total.influenceScore - a.total.influenceScore);
   }, [authorData, protocolFilter, trackFilter, statusFilter, searchTerm]);
 
   const protocols = ['all', 'ethereum', 'starknet', 'rollup', 'arbitrum'];
   const tracks = ['all', 'App', 'Core', 'Meta', 'Informational', 'Interface', 'Networking'];
+
+  // Determine which protocols to show in columns
+  const protocolsToShow = protocolFilter === 'all' ?
+    ['ethereum', 'starknet', 'rollup', 'arbitrum'] :
+    [protocolFilter];
 
   return (
     <Container size="xl" py="xl">
@@ -237,41 +295,60 @@ function AuthorsContent() {
           </Group>
         </Group>
 
-        <Table highlightOnHover withTableBorder withColumnBorders>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>Rank</Table.Th>
-              <Table.Th>Author</Table.Th>
-              <Table.Th ta="right">Protocols</Table.Th>
-              <Table.Th ta="right">Total Proposals</Table.Th>
-              <Table.Th ta="right">Finalized</Table.Th>
-              <Table.Th ta="right">Success Rate</Table.Th>
-              <Table.Th ta="right">
-                <Text fw={600} size="sm">Influence Score (%)</Text>
-              </Table.Th>
-              <Table.Th ta="right">Primary Track</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {isLoading ? (
-              Array(10).fill(0).map((_, i) => (
-                <Table.Tr key={i}>
-                  <Table.Td><Skeleton height={16} width={30} /></Table.Td>
-                  <Table.Td><Skeleton height={16} width={150} /></Table.Td>
-                  <Table.Td><Skeleton height={16} width={50} /></Table.Td>
-                  <Table.Td><Skeleton height={16} width={40} /></Table.Td>
-                  <Table.Td><Skeleton height={16} width={40} /></Table.Td>
-                  <Table.Td><Skeleton height={16} width={50} /></Table.Td>
-                  <Table.Td><Skeleton height={16} width={60} /></Table.Td>
-                  <Table.Td><Skeleton height={16} width={80} /></Table.Td>
-                </Table.Tr>
-              ))
-            ) : (
-              aggregatedAuthors.slice(0, 100).map((author, index) => {
-                const primaryTrack = Object.entries(author.trackDistribution)
-                  .sort(([,a], [,b]) => b - a)[0]?.[0] || 'N/A';
+        <Box style={{ overflowX: 'auto' }}>
+          <Table highlightOnHover withTableBorder withColumnBorders>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th rowSpan={2} style={{ verticalAlign: 'middle' }}>Rank</Table.Th>
+                <Table.Th rowSpan={2} style={{ verticalAlign: 'middle' }}>Author</Table.Th>
+                <Table.Th rowSpan={2} style={{ verticalAlign: 'middle', textAlign: 'right' }}>Protocols</Table.Th>
+                <Table.Th colSpan={4} ta="center" style={{ borderBottom: '1px solid var(--mantine-color-gray-3)' }}>
+                  <Text fw={600} size="sm">Total (Cross-Protocol)</Text>
+                </Table.Th>
+                {protocolsToShow.map(protocol => {
+                  const protocolColors = {
+                    ethereum: 'blue',
+                    starknet: 'blue',
+                    rollup: 'blue',
+                    arbitrum: 'blue'
+                  };
+                  return (
+                    <Table.Th key={protocol} colSpan={3} ta="center" style={{ borderBottom: '1px solid var(--mantine-color-gray-3)' }}>
+                      <Text fw={600} size="sm" c={protocolColors[protocol as keyof typeof protocolColors]}>
+                        {protocol.charAt(0).toUpperCase() + protocol.slice(1)}
+                      </Text>
+                    </Table.Th>
+                  );
+                })}
+              </Table.Tr>
+              <Table.Tr>
+                {/* Total columns */}
+                <Table.Th ta="right"><Text size="xs">Proposals</Text></Table.Th>
+                <Table.Th ta="right"><Text size="xs">Finalized</Text></Table.Th>
+                <Table.Th ta="right"><Text size="xs">Success %</Text></Table.Th>
+                <Table.Th ta="right"><Text size="xs">Influence %</Text></Table.Th>
 
-                return (
+                {/* Protocol-specific columns - only for selected protocols */}
+                {protocolsToShow.map(protocol => (
+                  <>
+                    <Table.Th key={`${protocol}-finalized`} ta="right"><Text size="xs">Finalized</Text></Table.Th>
+                    <Table.Th key={`${protocol}-success`} ta="right"><Text size="xs">Success %</Text></Table.Th>
+                    <Table.Th key={`${protocol}-influence`} ta="right"><Text size="xs">Influence %</Text></Table.Th>
+                  </>
+                ))}
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {isLoading ? (
+                Array(10).fill(0).map((_, i) => (
+                  <Table.Tr key={i}>
+                    {Array(7 + (protocolsToShow.length * 3)).fill(0).map((_, j) => (
+                      <Table.Td key={j}><Skeleton height={16} width={j === 1 ? 150 : 40} /></Table.Td>
+                    ))}
+                  </Table.Tr>
+                ))
+              ) : (
+                processedAuthors.slice(0, 100).map((author, index) => (
                   <Table.Tr key={author.name}>
                     <Table.Td>
                       <Text fw={500} c={index < 3 ? 'yellow' : index < 10 ? 'orange' : undefined}>
@@ -284,43 +361,101 @@ function AuthorsContent() {
                     <Table.Td ta="right">
                       <Text size="sm">{author.protocolsParticipated.length}</Text>
                     </Table.Td>
-                    <Table.Td ta="right">{author.totalProposals}</Table.Td>
+
+                    {/* Total columns */}
+                    <Table.Td ta="right">{author.total.totalProposals}</Table.Td>
                     <Table.Td ta="right">
-                      <Text c="green" fw={500}>{author.finalizedProposals}</Text>
+                      <Text c="green" fw={500}>{author.total.finalizedProposals}</Text>
                     </Table.Td>
                     <Table.Td ta="right">
                       <Text
-                        c={author.acceptanceRate > 0.5 ? 'green' : author.acceptanceRate > 0.2 ? 'orange' : 'red'}
+                        c={author.total.acceptanceRate > 0.5 ? 'green' : author.total.acceptanceRate > 0.2 ? 'orange' : 'red'}
                         fw={500}
+                        size="sm"
                       >
-                        {(author.acceptanceRate * 100).toFixed(0)}%
+                        {(author.total.acceptanceRate * 100).toFixed(0)}%
                       </Text>
                     </Table.Td>
                     <Table.Td ta="right">
-                      <Text fw={600} c="blue">{author.influenceScore.toFixed(2)}</Text>
+                      <Text fw={600} c="blue" size="sm">{author.total.influenceScore.toFixed(2)}%</Text>
                     </Table.Td>
-                    <Table.Td ta="right">
-                      <Text size="sm">{primaryTrack}</Text>
-                    </Table.Td>
+
+                    {/* Protocol-specific columns - only for selected protocols */}
+                    {protocolsToShow.map(protocol => {
+                      const protocolData = author.protocols[protocol];
+                      const protocolColors = {
+                        ethereum: 'blue',
+                        starknet: 'purple',
+                        rollup: 'orange',
+                        arbitrum: 'cyan'
+                      };
+
+                      if (!protocolData) {
+                        return (
+                          <>
+                            <Table.Td key={`${protocol}-finalized`} ta="right">
+                              <Text size="sm" c="dimmed">-</Text>
+                            </Table.Td>
+                            <Table.Td key={`${protocol}-success`} ta="right">
+                              <Text size="sm" c="dimmed">-</Text>
+                            </Table.Td>
+                            <Table.Td key={`${protocol}-influence`} ta="right">
+                              <Text size="sm" c="dimmed">-</Text>
+                            </Table.Td>
+                          </>
+                        );
+                      }
+
+                      return (
+                        <>
+                          <Table.Td key={`${protocol}-finalized`} ta="right">
+                            <Text c="green" fw={500} size="sm">{protocolData.finalizedProposals}</Text>
+                          </Table.Td>
+                          <Table.Td key={`${protocol}-success`} ta="right">
+                            <Text
+                              c={protocolData.acceptanceRate > 0.5 ? 'green' : protocolData.acceptanceRate > 0.2 ? 'orange' : 'red'}
+                              fw={500}
+                              size="sm"
+                            >
+                              {(protocolData.acceptanceRate * 100).toFixed(0)}%
+                            </Text>
+                          </Table.Td>
+                          <Table.Td key={`${protocol}-influence`} ta="right">
+                            <Text fw={600} c={protocolColors[protocol as keyof typeof protocolColors]} size="sm">
+                              {protocolData.influenceScore.toFixed(2)}%
+                            </Text>
+                          </Table.Td>
+                        </>
+                      );
+                    })}
                   </Table.Tr>
-                );
-              })
-            )}
-          </Table.Tbody>
-        </Table>
+                ))
+              )}
+            </Table.Tbody>
+          </Table>
+        </Box>
 
         <Center mt="lg">
-          <Text size="sm" c="dimmed" ta="center">
-            Influence Score = (Finalized Proposals) / (Total Finalized Proposals) × 100%.
-            Success Rate = (Finalized Proposals) / (Total Proposals).
-            Showing top 100 authors ranked by influence score.
+          <Text size="sm" c="dimmed" ta="center" maw={800}>
+            <Text fw={600} mb="xs">Calculation Details:</Text>
+            • <strong>Total Influence Score</strong>: (Author's Total Finalized Proposals) / (Global Total Finalized Proposals) × 100%<br/>
+            • <strong>Protocol Influence Score</strong>: (Author's Protocol Finalized Proposals) / (Protocol Total Finalized Proposals) × 100%<br/>
+            • <strong>Success Rate</strong>: (Finalized Proposals) / (Total Proposals) × 100%<br/>
+            <br/>
+            {protocolFilter === 'all' ? (
+              <>Protocol-specific influence scores sum to 100% within each protocol column.</>
+            ) : (
+              <>Showing only {protocolFilter} protocol data. Influence scores sum to 100% within this protocol.</>
+            )}
+            <br/>
+            Total influence scores sum to 100% across all protocols.
+            Showing top 100 authors ranked by {protocolFilter === 'all' ? 'total' : protocolFilter} influence score.
           </Text>
         </Center>
       </Stack>
     </Container>
   );
 }
-
 
 function AuthorsPageFallback() {
     return (
