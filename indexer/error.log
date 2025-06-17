@@ -1,0 +1,2 @@
+{"code":"ECONNREFUSED","level":"error","message":"Error in main loop for ethereum:","stack":"AggregateError [ECONNREFUSED]: \n    at internalConnectMultiple (node:net:1122:18)\n    at afterConnectMultiple (node:net:1689:7)"}
+{"code":"ECONNREFUSED","level":"error","message":"Error in main loop for ethereum:","stack":"AggregateError [ECONNREFUSED]: \n    at internalConnectMultiple (node:net:1122:18)\n    at afterConnectMultiple (node:net:1689:7)"}
