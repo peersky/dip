@@ -13,10 +13,7 @@ export async function GET(request: Request, context: any) {
   const { protocol } = params;
 
   if (!protocol) {
-    return NextResponse.json(
-      { success: false, error: "A 'protocol' parameter is required." },
-      { status: 400 },
-    );
+    return NextResponse.json({ success: false, error: "A 'protocol' parameter is required." }, { status: 400 });
   }
 
   try {
@@ -40,16 +37,10 @@ export async function GET(request: Request, context: any) {
 
     // Transform the raw snapshot data into a format suitable for time series charts.
     const timeSeriesData = historicalSnapshots.map((snapshot) => {
-      const acceptanceRate =
-        snapshot.distinctAuthorsCount > 0
-          ? snapshot.authorsOnFinalizedCount / snapshot.distinctAuthorsCount
-          : 0;
+      const acceptanceRate = snapshot.distinctAuthorsCount > 0 ? snapshot.authorsOnFinalizedCount / snapshot.distinctAuthorsCount : 0;
       const centralizationRate = 1 - acceptanceRate;
 
-      const proposalsPerAuthor =
-        snapshot.distinctAuthorsCount > 0
-          ? snapshot.totalProposals / snapshot.distinctAuthorsCount
-          : 0;
+      const proposalsPerAuthor = snapshot.distinctAuthorsCount > 0 ? snapshot.totalProposals / snapshot.distinctAuthorsCount : 0;
 
       return {
         // Format the date as YYYY-MM for clean chart labels.
@@ -68,17 +59,14 @@ export async function GET(request: Request, context: any) {
       data: timeSeriesData,
     });
   } catch (error: any) {
-    console.error(
-      `Failed to fetch historical analytics for protocol ${protocol}:`,
-      error,
-    );
+    console.error(`Failed to fetch historical analytics for protocol ${protocol}:`, error);
     return NextResponse.json(
       {
         success: false,
         error: "An error occurred while fetching historical analytics.",
         details: error.message,
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

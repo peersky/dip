@@ -10,9 +10,9 @@ interface RouteContext {
   };
 }
 
-export async function GET(request: NextRequest, context: RouteContext) {
+export async function GET(request: NextRequest, { params }: RouteContext) {
   try {
-    const { protocol, number } = context.params;
+    const { protocol, number } = params;
 
     if (!protocol || !number) {
       return NextResponse.json(

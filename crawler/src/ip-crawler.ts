@@ -1,21 +1,11 @@
-import {
-  repositories,
-  seedRepositoryConfigs,
-  processRepository,
-  RepositoryConfig,
-  resolveMovedProposals,
-  updateLatestSnapshots,
-} from "@peeramid-labs/dip-core";
+import { repositories, seedRepositoryConfigs, processRepository, RepositoryConfig, resolveMovedProposals, updateLatestSnapshots } from "@peeramid-labs/dip-core";
 import { Octokit } from "@octokit/core";
 import { restEndpointMethods } from "@octokit/plugin-rest-endpoint-methods";
 import { throttling } from "@octokit/plugin-throttling";
 import { paginateRest } from "@octokit/plugin-paginate-rest";
 import { retry } from "@octokit/plugin-retry";
 
-const OctokitWithPlugins = Octokit.plugin(restEndpointMethods)
-  .plugin(throttling)
-  .plugin(paginateRest)
-  .plugin(retry);
+const OctokitWithPlugins = Octokit.plugin(restEndpointMethods).plugin(throttling).plugin(paginateRest).plugin(retry);
 
 /**
  * Main entry point for the standalone crawler and data processing service.
@@ -42,18 +32,14 @@ async function main() {
     auth: process.env.GITHUB_PAT,
     throttle: {
       onRateLimit: (retryAfter: number, options: any) => {
-        console.warn(
-          `Request quota exhausted for request ${options.method} ${options.url}`,
-        );
+        console.warn(`Request quota exhausted for request ${options.method} ${options.url}`);
         if (options.request.retryCount < 3) {
           console.log(`Retrying after ${retryAfter} seconds!`);
           return true;
         }
       },
       onSecondaryRateLimit: (retryAfter: number, options: any) => {
-        console.warn(
-          `Secondary rate limit hit for ${options.method} ${options.url}`,
-        );
+        console.warn(`Secondary rate limit hit for ${options.method} ${options.url}`);
       },
     },
   });
@@ -84,10 +70,7 @@ async function main() {
       process.exit(0);
     }
   } catch (error: any) {
-    console.error(
-      `\n❌ FATAL: A critical error occurred during the job: ${error.message}`,
-      error,
-    );
+    console.error(`\n❌ FATAL: A critical error occurred during the job: ${error.message}`, error);
     if (process.env.NODE_ENV !== "test") {
       process.exit(1);
     }
