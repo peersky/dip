@@ -1,5 +1,4 @@
 import {
-  OctokitWithPlugins,
   repositories,
   seedRepositoryConfigs,
   processRepository,
@@ -7,6 +6,16 @@ import {
   resolveMovedProposals,
   updateLatestSnapshots,
 } from "@peeramid-labs/dip-core";
+import { Octokit } from "@octokit/core";
+import { restEndpointMethods } from "@octokit/plugin-rest-endpoint-methods";
+import { throttling } from "@octokit/plugin-throttling";
+import { paginateRest } from "@octokit/plugin-paginate-rest";
+import { retry } from "@octokit/plugin-retry";
+
+const OctokitWithPlugins = Octokit.plugin(restEndpointMethods)
+  .plugin(throttling)
+  .plugin(paginateRest)
+  .plugin(retry);
 
 /**
  * Main entry point for the standalone crawler and data processing service.
