@@ -3,14 +3,10 @@ import { prisma } from "@peeramid-labs/dip-database";
 
 export const dynamic = "force-dynamic";
 
-interface RouteContext {
-  params: {
-    protocol: string;
-    number: string;
-  };
-}
-
-export async function GET(request: NextRequest, { params }: RouteContext) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { protocol: string; number: string } },
+) {
   try {
     const { protocol, number } = params;
 
