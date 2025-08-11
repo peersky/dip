@@ -1,4 +1,11 @@
 {
+  "builds": [{ "src": "frontend/next.config.ts", "use": "@vercel/next" }],
+  "routes": [{ "src": "/(.*)", "dest": "frontend/$1" }],
+  "installCommand": "pnpm install",
+  "framework": "nextjs"
+}
+
+{
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
   "build": {
