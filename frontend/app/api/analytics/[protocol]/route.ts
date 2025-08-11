@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic"; // Ensures the data is fetched fresh on each request.
@@ -8,10 +8,8 @@ export const dynamic = "force-dynamic"; // Ensures the data is fetched fresh on 
  * This powers the "Analytics" tab on the subdomain pages, providing data for
  * trend analysis charts.
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { protocol: string } },
-) {
+export async function GET(request: Request, context: any) {
+  const { params } = context as { params: { protocol: string } };
   const { protocol } = params;
 
   if (!protocol) {
