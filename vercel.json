@@ -9,6 +9,6 @@
   },
   "installCommand": "pnpm install",
   "buildCommand": "pnpm turbo build --filter=happy-birthday",
-  "builds": [{ "src": "frontend/next.config.ts", "use": "@vercel/next" }],
+  "builds": [{ "src": "frontend/package.json", "use": "@vercel/next" }],
   "routes": [{ "src": "/(.*)", "dest": "frontend/$1" }]
 }
