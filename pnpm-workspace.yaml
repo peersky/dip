@@ -1,0 +1,5 @@
+packages:
+  - "crawler"
+  - "frontend"
+  - "packages/*"
+  - "!Polygon-Improvement-Proposals"

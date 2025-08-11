@@ -1,0 +1,160 @@
+/*
+ * GitHub Flavored Markdown "Dark Mode" CSS
+ * Adapted from sindresorhus/github-markdown-css for dark themes.
+ * This CSS module provides styles to make rendered markdown content
+ * look beautiful and readable on a dark background.
+ */
+
+.markdownBody {
+    -ms-text-size-adjust: 100%;
+    -webkit-text-size-adjust: 100%;
+    margin: 0;
+    color: #c9d1d9; /* Default text color for dark mode */
+    font-family:
+        -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial,
+        sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+    font-size: 16px;
+    line-height: 1.5;
+    word-wrap: break-word;
+}
+
+.markdownBody :global(a) {
+    background-color: transparent;
+    color: #58a6ff; /* Bright blue for links */
+    text-decoration: none;
+}
+
+.markdownBody :global(a:active),
+.markdownBody :global(a:hover) {
+    outline-width: 0;
+    text-decoration: underline;
+}
+
+.markdownBody :global(strong),
+.markdownBody :global(b) {
+    font-weight: 600;
+}
+
+.markdownBody :global(p) {
+    margin-top: 0;
+    margin-bottom: 16px;
+}
+
+.markdownBody :global(h1),
+.markdownBody :global(h2),
+.markdownBody :global(h3),
+.markdownBody :global(h4),
+.markdownBody :global(h5),
+.markdownBody :global(h6) {
+    margin-top: 24px;
+    margin-bottom: 16px;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+.markdownBody :global(h1) {
+    font-size: 2em;
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid #30363d; /* Dark border */
+}
+
+.markdownBody :global(h2) {
+    font-size: 1.5em;
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid #30363d; /* Dark border */
+}
+
+.markdownBody :global(h3) {
+    font-size: 1.25em;
+}
+
+.markdownBody :global(h4) {
+    font-size: 1em;
+}
+
+.markdownBody :global(h5) {
+    font-size: 0.875em;
+}
+
+.markdownBody :global(h6) {
+    font-size: 0.85em;
+    color: #8b949e; /* Muted gray for less important headings */
+}
+
+.markdownBody :global(ul),
+.markdownBody :global(ol) {
+    margin-top: 0;
+    margin-bottom: 16px;
+    padding-left: 2em;
+}
+
+.markdownBody :global(blockquote) {
+    margin: 0 0 16px 0;
+    padding: 0 1em;
+    color: #8b949e; /* Muted gray for blockquote text */
+    border-left: 0.25em solid #30363d; /* Dark border */
+}
+
+.markdownBody :global(hr) {
+    height: 0.25em;
+    padding: 0;
+    margin: 24px 0;
+    background-color: #30363d; /* Dark border */
+    border: 0;
+}
+
+/* Inline code */
+.markdownBody :global(code) {
+    font-family:
+        "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+    padding: 0.2em 0.4em;
+    margin: 0;
+    font-size: 85%;
+    background-color: rgba(110, 118, 129, 0.4); /* Subtle dark background */
+    border-radius: 6px;
+}
+
+.markdownBody :global(pre > code) {
+    padding: 0;
+    margin: 0;
+    font-size: 100%;
+    word-break: normal;
+    white-space: pre;
+    background: transparent;
+    border: 0;
+}
+
+.markdownBody :global(table) {
+    width: 100%;
+    border-collapse: collapse;
+    border-spacing: 0;
+    margin-top: 0;
+    margin-bottom: 16px;
+    display: block;
+    overflow: auto;
+}
+
+.markdownBody :global(table th) {
+    font-weight: 600;
+}
+
+.markdownBody :global(table th),
+.markdownBody :global(table td) {
+    padding: 6px 13px;
+    border: 1px solid #30363d; /* Dark border */
+}
+
+.markdownBody :global(table tr) {
+    background-color: #0d1117; /* Base dark color for rows */
+    border-top: 1px solid #30363d;
+}
+
+.markdownBody :global(table tr:nth-child(2n)) {
+    background-color: #161b22; /* Slightly different shade for zebra striping */
+}
+
+.markdownBody :global(img) {
+    max-width: 100%;
+    box-sizing: content-box;
+    background-color: #0d1117;
+}

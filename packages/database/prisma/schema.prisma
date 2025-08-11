@@ -1,0 +1,231 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// EIP Data Storage Models
+// This new schema is designed to capture the historical evolution of proposals
+// by treating the Git commit history as the source of truth.
+
+// Configuration for each repository we crawl
+model Repository {
+  owner          String
+  ecosystem      String
+  repo           String
+  branch         String
+  eipsFolder     String
+  protocol       String
+  proposalPrefix String
+  enabled        Boolean @default(true)
+  description    String?
+  website        String?
+
+  // Tracks the last commit processed to prevent re-crawling the same history.
+  lastCrawledCommitSha String?
+
+  // Relationships
+  proposals Proposal[]
+
+  // Metadata
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  Maintainer Maintainer[]
+
+  @@id([owner, repo, protocol])
+}
+
+// Represents a single, unique proposal (e.g., EIP-1).
+// This table holds metadata that points to the *latest* known version.
+model Proposal {
+  id                 String     @id @default(cuid())
+  repositoryOwner    String
+  repositoryRepo     String
+  repositoryProtocol String
+  repository         Repository @relation(fields: [repositoryOwner, repositoryRepo, repositoryProtocol], references: [owner, repo, protocol], onDelete: Cascade)
+
+  proposalNumber String // The number, e.g., "1" for "EIP-1"
+  githubPath     String // The current file path in the repo
+
+  // --- Latest Metadata (denormalized for easy access) ---
+  title         String    @db.Text
+  status        String
+  type          String
+  category      String?
+  created       DateTime?
+  discussionsTo String?
+  requires      String[]
+
+  // A proposal is defined by its series of versions
+  versions ProposalVersion[]
+
+  // --- Move Tracking ---
+  // If a proposal is moved, this will store the raw path from the move notice.
+  movedToPath String?
+  // This will link to the new proposal record after the move has been fully resolved.
+  movedToId   String?    @unique
+  movedTo     Proposal?  @relation("ProposalMove", fields: [movedToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  movedFrom   Proposal[] @relation("ProposalMove")
+
+  @@unique([repositoryOwner, repositoryRepo, repositoryProtocol, proposalNumber])
+  @@index([status])
+  @@index([type])
+}
+
+// This is the core of the new architecture.
+// Each record is an immutable version of a proposal at a specific commit.
+model ProposalVersion {
+  id         String   @id @default(cuid())
+  proposalId String
+  proposal   Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  commitSha  String // The Git commit hash that introduced this version
+  commitDate DateTime // The timestamp of the commit
+
+  // We store the full markdown for historical diffing and analysis
+  rawMarkdown String @db.Text
+  // A hash to quickly check if content has changed between commits
+  contentHash String
+
+  // --- Parsed Metadata for THIS Version ---
+  title         String    @db.Text
+  status        String
+  type          String
+  category      String?
+  created       DateTime?
+  discussionsTo String?
+  requires      String[]
+
+  // The authors of THIS specific version
+  authors AuthorsOnProposalVersions[]
+
+  @@unique([proposalId, commitSha]) // A proposal can only have one version per commit
+  @@index([commitSha])
+  @@index([proposalId, commitDate]) // For querying proposal history chronologically
+}
+
+model Author {
+  id           String  @id @default(cuid())
+  name         String?
+  githubHandle String? @unique
+  email        String? @unique
+
+  // Relationships
+  versions AuthorsOnProposalVersions[]
+
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  Maintainer Maintainer[]
+
+  @@index([githubHandle])
+}
+
+// Joins Authors to specific ProposalVersions
+model AuthorsOnProposalVersions {
+  proposalVersionId String
+  proposalVersion   ProposalVersion @relation(fields: [proposalVersionId], references: [id], onDelete: Cascade)
+  authorId          String
+  author            Author          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  authorSince DateTime @default(now())
+
+  @@id([proposalVersionId, authorId])
+}
+
+model ProtocolStatsSnapshot {
+  id                      String               @id @default(cuid())
+  protocol                String
+  snapshotDate            DateTime
+  year                    Int
+  month                   Int
+  totalProposals          Int                  @default(0)
+  distinctAuthorsCount    Int                  @default(0)
+  authorsOnFinalizedCount Int                  @default(0)
+  totalWordCount          Int                  @default(0)
+  averageWordCount        Float                @default(0)
+  statusCounts            Json
+  typeCounts              Json
+  yearCounts              Json
+  tracks                  TrackStatsSnapshot[]
+
+  @@unique([protocol, year, month])
+  @@index([protocol, snapshotDate])
+}
+
+model TrackStatsSnapshot {
+  id                             String                @id @default(cuid())
+  snapshotId                     String
+  snapshot                       ProtocolStatsSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  trackName                      String
+  totalProposalsInTrack          Int                   @default(0)
+  finalizedProposalsInTrack      Int                   @default(0)
+  distinctAuthorsInTrackCount    Int                   @default(0)
+  authorsOnFinalizedInTrackCount Int                   @default(0)
+  statusCountsInTrack            Json
+
+  @@unique([snapshotId, trackName])
+  @@index([snapshotId])
+}
+
+// Stores pre-aggregated, ecosystem-wide historical data points for efficient time-series querying.
+model GlobalStatsSnapshot {
+  id                      String   @id @default(cuid())
+  snapshotDate            DateTime
+  year                    Int
+  month                   Int
+  totalProposals          Int
+  distinctAuthorsCount    Int
+  authorsOnFinalizedCount Int
+  centralizationRate      Float
+  acceptanceRate          Float
+
+  @@unique([year, month])
+  @@index([snapshotDate])
+}
+
+model Maintainer {
+  authorId           String
+  author             Author     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  repositoryOwner    String
+  repositoryRepo     String
+  repositoryProtocol String
+  repository         Repository @relation(fields: [repositoryOwner, repositoryRepo, repositoryProtocol], references: [owner, repo, protocol], onDelete: Cascade)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  @@id([authorId, repositoryOwner, repositoryRepo, repositoryProtocol])
+  @@map("maintainers")
+}
+
+model ProtocolStats {
+  protocol                String       @id
+  totalProposals          Int          @default(0)
+  distinctAuthorsCount    Int          @default(0)
+  authorsOnFinalizedCount Int          @default(0)
+  totalWordCount          Int          @default(0)
+  averageWordCount        Float        @default(0)
+  statusCounts            Json
+  typeCounts              Json
+  yearCounts              Json
+  lastUpdated             DateTime
+  tracks                  TrackStats[]
+}
+
+model TrackStats {
+  id                             String        @id @default(cuid())
+  protocol                       String
+  trackName                      String
+  protocolStats                  ProtocolStats @relation(fields: [protocol], references: [protocol], onDelete: Cascade)
+  totalProposalsInTrack          Int           @default(0)
+  finalizedProposalsInTrack      Int           @default(0)
+  distinctAuthorsInTrackCount    Int           @default(0)
+  authorsOnFinalizedInTrackCount Int           @default(0)
+  acceptanceScoreForTrack        Float         @default(0)
+  statusCountsInTrack            Json
+  updatedAt                      DateTime      @updatedAt
+
+  @@unique([protocol, trackName])
+}
