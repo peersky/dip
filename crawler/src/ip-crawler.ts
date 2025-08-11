@@ -1,4 +1,5 @@
 import {
+  OctokitWithPlugins,
   repositories,
   seedRepositoryConfigs,
   processRepository,

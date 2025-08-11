@@ -6,3 +6,6 @@ node_modules/
 Polygon-Improvement-Proposals/
 *.pem
 EIPs/
+.turbo
+*.tsbuildinfo
+dist

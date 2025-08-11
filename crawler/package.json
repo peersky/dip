@@ -7,7 +7,7 @@
   "scripts": {
     "start": "ts-node -r dotenv/config src/ip-crawler.ts",
     "dev": "ts-node-dev --respawn --transpile-only src/ip-crawler.ts",
-    "build": "tsc -p .",
+    "build": "tsc --build",
     "generate-snapshots": "ts-node -r dotenv/config src/generate-historical-snapshots.ts",
     "inspect-proposals": "ts-node -r dotenv/config src/inspect-proposals.ts",
     "db:dedup-authors": "ts-node -r dotenv/config src/merge-duplicate-authors.ts",
@@ -23,6 +23,7 @@
     "@octokit/core": "^5.2.0",
     "@octokit/plugin-paginate-rest": "^13.1.1",
     "@octokit/plugin-rest-endpoint-methods": "^13.5.0",
+    "@octokit/plugin-retry": "^6.1.0",
     "@octokit/plugin-throttling": "^9.2.1",
     "@peeramid-labs/dip-core": "workspace:*",
     "@peeramid-labs/dip-database": "workspace:*",

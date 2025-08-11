@@ -3,18 +3,15 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic"; // Ensures the data is fetched fresh on each request.
 
-interface RouteContext {
-  params: {
-    protocol: string;
-  };
-}
-
 /**
  * API route to fetch the complete historical time series data for a specific protocol.
  * This powers the "Analytics" tab on the subdomain pages, providing data for
  * trend analysis charts.
  */
-export async function GET(request: NextRequest, { params }: RouteContext) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { protocol: string } },
+) {
   const { protocol } = params;
 
   if (!protocol) {
