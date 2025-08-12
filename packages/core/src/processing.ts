@@ -903,12 +903,29 @@ export async function calculateAndCacheStatistics(
       finalizedAuthorsByTrack.get(track)?.size || 0;
   }
 
+  // --- Final Metric Calculations ---
+
+  // 1. Author-centric metrics for Centralization
   stats.distinctAuthorsCount = eligibleAuthors.size;
   stats.authorsOnFinalizedCount = finalizedAuthors.size;
+
+  // 2. Proposal-centric metrics for Acceptance Rate
+  const finalizedProposalCount =
+    (stats.statusCounts["Final"] || 0) + (stats.statusCounts["Living"] || 0);
+  const withdrawnProposalCount = stats.statusCounts["Withdrawn"] || 0;
+  const stagnantProposalCount = stats.statusCounts["Stagnant"] || 0;
+
+  const eligibleProposalCount =
+    stats.totalProposals - withdrawnProposalCount - stagnantProposalCount;
+
+  stats.acceptanceScore =
+    eligibleProposalCount > 0
+      ? finalizedProposalCount / eligibleProposalCount
+      : 0;
+
+  // 3. General stats
   stats.averageWordCount =
     stats.totalProposals > 0 ? stats.totalWordCount / stats.totalProposals : 0;
-  stats.acceptanceScore =
-    eligibleAuthors.size > 0 ? finalizedAuthors.size / eligibleAuthors.size : 0;
 
   const year = snapshotDate.getUTCFullYear();
   const month = snapshotDate.getUTCMonth() + 1;
