@@ -22,6 +22,7 @@ export default {
   reactStrictMode: false,
   trailingSlash: false,
   output: "standalone",
+  serverComponentsExternalPackages: ["@prisma/client", "prisma"],
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   webpack: (
     config: any,
@@ -75,6 +76,7 @@ export default {
   experimental: {
     externalDir: true,
     optimizePackageImports: ["@mantine/core", "@mantine/hooks"],
+    serverComponentsExternalPackages: ["@prisma/client", "prisma"],
   },
   transpilePackages: ["@peeramid-labs/dip-database"],
 };
