@@ -26,6 +26,7 @@ export default {
   // target: "serverless",
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   webpack: (config: any, { isServer, webpack }: { isServer: boolean; webpack: any }) => {
+    const path = require("path");
     const envs: { [key: string]: string } = {};
     Object.keys(process.env).forEach((env) => {
       if (env.startsWith("NEXT_PUBLIC_")) {
@@ -42,15 +43,12 @@ export default {
       );
     }
 
-    // // Help with module resolution
-    // config.resolve.alias = {
-    //   ...config.resolve.alias,
-    //   "@": ".",
-    //   "@/components": "./components",
-    //   "@/lib": "./lib",
-    //   "@/app": "./app",
-    //   "@/hooks": "./hooks",
-    // };
+    // Ensure local workspace packages resolve during Next build on Vercel
+    config.resolve.alias = {
+      ...(config.resolve.alias || {}),
+      "@peeramid-labs/dip-database": path.join(__dirname, "../packages/database/dist"),
+      "@peeramid-labs/dip-core": path.join(__dirname, "../packages/core/dist"),
+    };
 
     // Fixes npm packages that depend on `fs` module
     if (!isServer) {
