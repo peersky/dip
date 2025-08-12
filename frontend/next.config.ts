@@ -22,10 +22,11 @@ export default {
   reactStrictMode: false,
   trailingSlash: false,
   output: "standalone",
-  // output: "standalone",
-  // target: "serverless",
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  webpack: (config: any, { isServer, webpack }: { isServer: boolean; webpack: any }) => {
+  webpack: (
+    config: any,
+    { isServer, webpack }: { isServer: boolean; webpack: any },
+  ) => {
     const path = require("path");
     const envs: { [key: string]: string } = {};
     Object.keys(process.env).forEach((env) => {
@@ -39,7 +40,7 @@ export default {
         new webpack.DefinePlugin({
           "process.env": JSON.stringify(envs),
           "import.meta.webpackHot": "module.hot",
-        })
+        }),
       );
     }
 
@@ -55,7 +56,7 @@ export default {
     config.plugins.push(
       new webpack.IgnorePlugin({
         resourceRegExp: /^electron$/,
-      })
+      }),
     );
 
     if (config.cache && !isServer) {
@@ -75,5 +76,5 @@ export default {
     externalDir: true,
     optimizePackageImports: ["@mantine/core", "@mantine/hooks"],
   },
-  transpilePackages: ["@peeramid-labs/dip-core", "@peeramid-labs/dip-database"],
+  transpilePackages: ["@peeramid-labs/dip-database"],
 };
