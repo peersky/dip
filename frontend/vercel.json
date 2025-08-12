@@ -1,8 +1,0 @@
-{
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "version": 2,
-  "framework": "nextjs",
-  "installCommand": "cd .. && pnpm install && pnpm -w --filter @peeramid-labs/dip-database build && pnpm -w --filter @peeramid-labs/dip-core build && cd frontend && pnpm install",
-  "buildCommand": "next build",
-  "outputDirectory": ".next"
-}
