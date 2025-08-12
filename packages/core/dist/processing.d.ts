@@ -1,9 +1,9 @@
 import { Octokit } from "@octokit/core";
 import { RepositoryConfig } from "./types";
-declare const MyOctokitWithPlugins: typeof Octokit & import("@octokit/core/dist-types/types").Constructor<import("@octokit/plugin-rest-endpoint-methods").Api> & import("@octokit/core/dist-types/types").Constructor<{}> & import("@octokit/core/dist-types/types").Constructor<{
+declare const OctokitWithPlugins: typeof Octokit & import("@octokit/core/dist-types/types").Constructor<import("@octokit/plugin-rest-endpoint-methods").Api> & import("@octokit/core/dist-types/types").Constructor<{}> & import("@octokit/core/dist-types/types").Constructor<{
     paginate: import("@octokit/plugin-paginate-rest").PaginateInterface;
 }> & import("@octokit/core/dist-types/types").Constructor<any>;
-export type OctokitClient = InstanceType<typeof MyOctokitWithPlugins>;
+export type OctokitClient = InstanceType<typeof OctokitWithPlugins>;
 export declare const repositories: RepositoryConfig[];
 export declare function seedRepositoryConfigs(): Promise<void>;
 export declare function processRepository(octokit: OctokitClient, repoConfig: RepositoryConfig): Promise<void>;

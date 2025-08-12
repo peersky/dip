@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import type { Proposal, ProposalVersion, Author } from "@prisma/client";
+import type {
+  Proposal,
+  ProposalVersion,
+  Author,
+} from "@peeramid-labs/dip-database";
 
 // Define an extended type for our versions to include authors
 type VersionWithAuthors = ProposalVersion & {
@@ -15,10 +19,10 @@ type UnifiedProposal = Proposal & {
 };
 
 interface RouteContext {
-  params: {
+  params: Promise<{
     protocol: string;
     slug: string;
-  };
+  }>;
 }
 
 /**
@@ -88,7 +92,7 @@ async function getUnifiedProposalHistory(
 }
 
 export async function GET(request: NextRequest, { params }: RouteContext) {
-  const { protocol, slug } = params;
+  const { protocol, slug } = await params;
 
   if (!protocol || !slug) {
     return NextResponse.json(

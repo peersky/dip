@@ -4,11 +4,11 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic"; // Ensure fresh data on each request
 
 interface RouteContext {
-  params: { protocol: string };
+  params: Promise<{ protocol: string }>;
 }
 
 export async function GET(request: NextRequest, context: RouteContext) {
-  const protocol = (await context.params).protocol;
+  const { protocol } = await context.params;
 
   if (!protocol) {
     return NextResponse.json(

@@ -25,9 +25,9 @@ interface StatusEvent {
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { protocol: string } },
+  { params }: { params: Promise<{ protocol: string }> },
 ) {
-  const { protocol } = params;
+  const { protocol } = await params;
 
   if (!protocol) {
     return NextResponse.json(

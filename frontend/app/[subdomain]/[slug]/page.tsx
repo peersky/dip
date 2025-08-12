@@ -206,10 +206,11 @@ function AnalyticsView({ proposal }: { proposal: UnifiedProposal }) {
             />
             <Tooltip
               labelFormatter={(label) => new Date(label).toLocaleDateString()}
-              formatter={(value, name, props) => [
-                props.payload.status,
-                "Status",
-              ]}
+              formatter={(value, name, props) => {
+                // This 'as any' is a common workaround for a known issue with
+                // the recharts Tooltip formatter's generic typings.
+                return [props.payload.status, "Status"] as any;
+              }}
             />
             <Legend />
             <Line

@@ -6,11 +6,17 @@ export async function POST(request: Request) {
     const { installationId } = await request.json();
 
     if (!installationId) {
-      return NextResponse.json({ error: "Installation ID is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Installation ID is required" },
+        { status: 400 },
+      );
     }
 
     // Development mode: return mock data for testing
-    if (process.env.NODE_ENV === "development" && installationId === "12345678") {
+    if (
+      process.env.NODE_ENV === "development" &&
+      installationId === "12345678"
+    ) {
       console.log("🧪 Development mode: returning mock installation data");
       return NextResponse.json({
         installation: {
@@ -51,7 +57,10 @@ export async function POST(request: Request) {
 
     if (!appId || !privateKey) {
       console.error("Missing GitHub App configuration");
-      return NextResponse.json({ error: "GitHub App not configured" }, { status: 500 });
+      return NextResponse.json(
+        { error: "GitHub App not configured" },
+        { status: 500 },
+      );
     }
 
     // Create GitHub App instance
@@ -60,38 +69,51 @@ export async function POST(request: Request) {
       privateKey: privateKey.replace(/\\n/g, "\n"), // Handle newlines in env var
     });
 
-    // Get installation
-    const { data: installation } = await app.octokit.rest.apps.getInstallation({
+    // Authenticate as the app to get installation details
+    const appOctokit = await app.getInstallationOctokit(
+      parseInt(installationId),
+    );
+    const { data: installation } = await appOctokit.rest.apps.getInstallation({
       installation_id: parseInt(installationId),
     });
 
     // Check if installation has an account
     if (!installation.account) {
       console.error("Installation has no associated account");
-      return NextResponse.json({ error: "Installation account not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Installation account not found" },
+        { status: 404 },
+      );
     }
 
     // Get installation access token
-    const installationOctokit = await app.getInstallationOctokit(parseInt(installationId));
+    const installationOctokit = await app.getInstallationOctokit(
+      parseInt(installationId),
+    );
 
     // Get user/organization info - handle both account types
     let user;
     try {
       // Check if it's a User account (has 'type' property) or Organization (has 'slug' property)
-      const isUserAccount = "type" in installation.account && installation.account.type === "User";
+      const isUserAccount =
+        "type" in installation.account && installation.account.type === "User";
       const isOrgAccount = "slug" in installation.account;
 
       if (isUserAccount) {
         // For user accounts, get detailed user info
-        const userLogin = "login" in installation.account ? installation.account.login : "";
-        const { data: userData } = await installationOctokit.rest.users.getByUsername({
-          username: userLogin,
-        });
+        const userLogin =
+          "login" in installation.account ? installation.account.login : "";
+        const { data: userData } =
+          await installationOctokit.rest.users.getByUsername({
+            username: userLogin,
+          });
         user = userData;
       } else if (isOrgAccount) {
         // For organizations, use the installation account info
-        const orgName = "name" in installation.account ? installation.account.name : "";
-        const orgLogin = "slug" in installation.account ? installation.account.slug : "";
+        const orgName =
+          "name" in installation.account ? installation.account.name : "";
+        const orgLogin =
+          "slug" in installation.account ? installation.account.slug : "";
         user = {
           login: orgLogin,
           id: installation.account.id,
@@ -101,7 +123,12 @@ export async function POST(request: Request) {
         };
       } else {
         // Fallback for unknown account types
-        const accountLogin = "login" in installation.account ? installation.account.login : "slug" in installation.account ? installation.account.slug : "unknown";
+        const accountLogin =
+          "login" in installation.account
+            ? installation.account.login
+            : "slug" in installation.account
+              ? installation.account.slug
+              : "unknown";
         user = {
           login: accountLogin,
           id: installation.account.id,
@@ -111,9 +138,17 @@ export async function POST(request: Request) {
         };
       }
     } catch (userError) {
-      console.warn("Could not fetch user details, using installation account info:", userError);
+      console.warn(
+        "Could not fetch user details, using installation account info:",
+        userError,
+      );
       // Fallback to installation account info
-      const accountLogin = "login" in installation.account ? installation.account.login : "slug" in installation.account ? installation.account.slug : "unknown";
+      const accountLogin =
+        "login" in installation.account
+          ? installation.account.login
+          : "slug" in installation.account
+            ? installation.account.slug
+            : "unknown";
       user = {
         login: accountLogin,
         id: installation.account.id,
@@ -124,11 +159,20 @@ export async function POST(request: Request) {
     }
 
     // Get accessible repositories
-    const { data: repositories } = await installationOctokit.rest.apps.listReposAccessibleToInstallation();
+    const { data: repositories } =
+      await installationOctokit.rest.apps.listReposAccessibleToInstallation();
 
     // Safe logging that handles both User and Organization account types
-    const accountLogin = "login" in installation.account ? installation.account.login : "slug" in installation.account ? installation.account.slug : "unknown";
-    const accountType = "type" in installation.account ? installation.account.type : "Organization";
+    const accountLogin =
+      "login" in installation.account
+        ? installation.account.login
+        : "slug" in installation.account
+          ? installation.account.slug
+          : "unknown";
+    const accountType =
+      "type" in installation.account
+        ? installation.account.type
+        : "Organization";
 
     console.log(`Installation ${installationId} verified:`, {
       account: accountLogin,
@@ -160,7 +204,10 @@ export async function POST(request: Request) {
     console.error("GitHub App installation processing error:", error);
 
     if (error.status === 404) {
-      return NextResponse.json({ error: "Installation not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Installation not found" },
+        { status: 404 },
+      );
     }
 
     return NextResponse.json(
@@ -168,13 +215,14 @@ export async function POST(request: Request) {
         error: "Failed to process installation",
         details: error.message,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function GET() {
   return NextResponse.json({
-    message: "GitHub App installation processing endpoint. Use POST with installation ID.",
+    message:
+      "GitHub App installation processing endpoint. Use POST with installation ID.",
   });
 }

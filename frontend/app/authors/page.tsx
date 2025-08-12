@@ -17,32 +17,14 @@ import {
   TextInput,
   Badge,
 } from "@mantine/core";
-import { IconSearch, IconExternalLink } from "@tabler/icons-react";
+import { IconSearch } from "@tabler/icons-react";
 import { useState, useMemo, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import Link from "next/link";
-
-// This interface defines the shape of the author data returned by our API.
-interface AuthorData {
-  id: string;
-  name: string | null;
-  githubHandle: string | null;
-  email: string | null;
-  totalContributions: number;
-  finalizedContributions: number;
-  contributionByRepo: Record<string, number>;
-  influenceScore: number | null;
-}
-
-interface ProtocolAuthorData {
-  protocol: string;
-  authors: AuthorStats[];
-  totalFinalizedProposals: number;
-}
+import { AuthorStats } from "@peeramid-labs/dip-database";
 
 function AuthorsContent() {
   const searchParams = useSearchParams();
-  const [authors, setAuthors] = useState<AuthorData[]>([]);
+  const [authors, setAuthors] = useState<AuthorStats[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [protocolFilter, setProtocolFilter] = useState("all");

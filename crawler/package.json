@@ -20,11 +20,11 @@
     "db:merge-erc-histories": "ts-node -r dotenv/config src/merge-erc-histories.ts"
   },
   "dependencies": {
-    "@octokit/core": "^5.2.0",
+    "@octokit/core": "^7.0.3",
     "@octokit/plugin-paginate-rest": "^13.1.1",
-    "@octokit/plugin-rest-endpoint-methods": "^13.5.0",
-    "@octokit/plugin-retry": "^6.1.0",
-    "@octokit/plugin-throttling": "^9.2.1",
+    "@octokit/plugin-rest-endpoint-methods": "^16.0.0",
+    "@octokit/plugin-retry": "^8.0.1",
+    "@octokit/plugin-throttling": "^11.0.0",
     "@peeramid-labs/dip-core": "workspace:*",
     "@peeramid-labs/dip-database": "workspace:*",
     "dotenv": "^16.3.1",

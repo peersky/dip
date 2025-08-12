@@ -25,7 +25,7 @@ const parsers_1 = require("./parsers");
 // --- Type Definition ---
 // This is the correct way to define the type for the Octokit client that this library expects.
 // The application (crawler) will be responsible for creating an instance of this type.
-const MyOctokitWithPlugins = core_1.Octokit.plugin(plugin_rest_endpoint_methods_1.restEndpointMethods)
+const OctokitWithPlugins = core_1.Octokit.plugin(plugin_rest_endpoint_methods_1.restEndpointMethods)
     .plugin(plugin_throttling_1.throttling)
     .plugin(plugin_paginate_rest_1.paginateRest)
     .plugin(plugin_retry_1.retry);
@@ -198,7 +198,8 @@ async function processCommit(octokit, repoConfig, commitSummary) {
                         const existingAuthorByEmail = await tx.author.findUnique({
                             where: { email },
                         });
-                        if (existingAuthorByEmail && existingAuthorByEmail.id !== dbAuthor.id) {
+                        if (existingAuthorByEmail &&
+                            existingAuthorByEmail.id !== dbAuthor.id) {
                             console.warn(`Could not update email for author ${dbAuthor.name || dbAuthor.githubHandle} to ${email} as it's already taken.`);
                         }
                         else {
@@ -391,7 +392,8 @@ async function processProposalFile(octokit, repoConfig, filePath, commitSha, com
         if (!proposalNumberMatch)
             return;
         const proposalNumber = proposalNumberMatch[1];
-        if (rawMarkdown.includes("This file was moved to") || rawMarkdown.includes("This EIP was moved to")) {
+        if (rawMarkdown.includes("This file was moved to") ||
+            rawMarkdown.includes("This EIP was moved to")) {
             console.log(`[Moved] Detected moved notice for: ${filePath}`);
             const movePathMatch = rawMarkdown.match(/\[.*?\]\((.*?\/\S+\.md)\)/);
             const movedToPath = movePathMatch ? movePathMatch[1] : null;
@@ -402,7 +404,10 @@ async function processProposalFile(octokit, repoConfig, filePath, commitSha, com
                 console.warn(`[Moved] Could not extract destination path from move notice for: ${filePath}`);
             }
             const commitDate = commitDateStr ? new Date(commitDateStr) : new Date();
-            const contentHash = crypto_1.default.createHash("sha256").update(contentBody).digest("hex");
+            const contentHash = crypto_1.default
+                .createHash("sha256")
+                .update(contentBody)
+                .digest("hex");
             await dip_database_1.prisma.$transaction(async (tx) => {
                 const proposal = await tx.proposal.findUnique({
                     where: {
@@ -455,9 +460,12 @@ async function processProposalFile(octokit, repoConfig, filePath, commitSha, com
             console.warn(`[Parsing Failed] Could not parse metadata for: ${filePath}`);
             return;
         }
-        const { title, status, type, category, created, discussionsTo, authors, requires } = parsedData;
+        const { title, status, type, category, created, discussionsTo, authors, requires, } = parsedData;
         const commitDate = commitDateStr ? new Date(commitDateStr) : new Date();
-        const contentHash = crypto_1.default.createHash("sha256").update(contentBody).digest("hex");
+        const contentHash = crypto_1.default
+            .createHash("sha256")
+            .update(contentBody)
+            .digest("hex");
         await dip_database_1.prisma.$transaction(async (tx) => {
             const proposal = await tx.proposal.upsert({
                 where: {
@@ -710,8 +718,10 @@ async function calculateAndCacheStatistics(protocol, snapshotDate) {
                     statusCountsInTrack: {},
                 };
             }
-            stats.statusCounts[proposal.status] = (stats.statusCounts[proposal.status] || 0) + 1;
-            stats.typeCounts[proposal.type] = (stats.typeCounts[proposal.type] || 0) + 1;
+            stats.statusCounts[proposal.status] =
+                (stats.statusCounts[proposal.status] || 0) + 1;
+            stats.typeCounts[proposal.type] =
+                (stats.typeCounts[proposal.type] || 0) + 1;
             if (proposal.created) {
                 const year = new Date(proposal.created).getFullYear().toString();
                 stats.yearCounts[year] = (stats.yearCounts[year] || 0) + 1;
@@ -723,20 +733,25 @@ async function calculateAndCacheStatistics(protocol, snapshotDate) {
             }
             const trackStats = stats.tracksBreakdown[track];
             trackStats.totalProposalsInTrack++;
-            trackStats.statusCountsInTrack[proposal.status] = (trackStats.statusCountsInTrack[proposal.status] || 0) + 1;
+            trackStats.statusCountsInTrack[proposal.status] =
+                (trackStats.statusCountsInTrack[proposal.status] || 0) + 1;
             if (finalizedStatuses.includes(proposal.status)) {
                 trackStats.finalizedProposalsInTrack++;
             }
         }
     }
     for (const track in stats.tracksBreakdown) {
-        stats.tracksBreakdown[track].distinctAuthorsInTrackCount = authorsByTrack.get(track)?.size || 0;
-        stats.tracksBreakdown[track].authorsOnFinalizedInTrackCount = finalizedAuthorsByTrack.get(track)?.size || 0;
+        stats.tracksBreakdown[track].distinctAuthorsInTrackCount =
+            authorsByTrack.get(track)?.size || 0;
+        stats.tracksBreakdown[track].authorsOnFinalizedInTrackCount =
+            finalizedAuthorsByTrack.get(track)?.size || 0;
     }
     stats.distinctAuthorsCount = eligibleAuthors.size;
     stats.authorsOnFinalizedCount = finalizedAuthors.size;
-    stats.averageWordCount = stats.totalProposals > 0 ? stats.totalWordCount / stats.totalProposals : 0;
-    stats.acceptanceScore = eligibleAuthors.size > 0 ? finalizedAuthors.size / eligibleAuthors.size : 0;
+    stats.averageWordCount =
+        stats.totalProposals > 0 ? stats.totalWordCount / stats.totalProposals : 0;
+    stats.acceptanceScore =
+        eligibleAuthors.size > 0 ? finalizedAuthors.size / eligibleAuthors.size : 0;
     const year = snapshotDate.getUTCFullYear();
     const month = snapshotDate.getUTCMonth() + 1;
     const snapshotData = {
@@ -887,13 +902,15 @@ async function regenerateAllHistoricalSnapshots() {
         const year = currentDate.getUTCFullYear();
         const month = currentDate.getUTCMonth() + 1;
         console.log(`\n--- Processing snapshots for ${year}-${month} ---`);
+        const snapshotDateForMonth = new Date(Date.UTC(year, month, 0));
         for (let i = 0; i < protocols.length; i += CONCURRENCY_LIMIT) {
             const batch = protocols.slice(i, i + CONCURRENCY_LIMIT);
             console.log(`   -> Processing batch of ${batch.length} protocols: [${batch.join(", ")}]`);
-            const snapshotDateForMonth = new Date(Date.UTC(year, month, 0));
             const batchPromises = batch.map((protocol) => calculateAndCacheStatistics(protocol, snapshotDateForMonth));
             await Promise.all(batchPromises);
         }
+        // After processing all protocols for the month, create the global aggregate.
+        await aggregateAndStoreForMonth(snapshotDateForMonth);
         currentDate.setUTCMonth(currentDate.getUTCMonth() + 1);
     }
     console.log("\nHistorical snapshot regeneration completed successfully!");
@@ -922,7 +939,9 @@ async function aggregateAndStoreForMonth(dateForMonth) {
         distinctAuthorsCount: 0,
         authorsOnFinalizedCount: 0,
     });
-    const acceptanceRate = globalStats.distinctAuthorsCount > 0 ? globalStats.authorsOnFinalizedCount / globalStats.distinctAuthorsCount : 0;
+    const acceptanceRate = globalStats.distinctAuthorsCount > 0
+        ? globalStats.authorsOnFinalizedCount / globalStats.distinctAuthorsCount
+        : 0;
     const centralizationRate = 1 - acceptanceRate;
     const snapshotDate = new Date(Date.UTC(year, month, 0));
     const globalSnapshotData = {

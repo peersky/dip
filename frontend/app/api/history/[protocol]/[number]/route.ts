@@ -5,10 +5,17 @@ export const dynamic = "force-dynamic";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { protocol: string; number: string } },
+  {
+    params,
+  }: {
+    params: Promise<{
+      protocol: string;
+      number: string;
+    }>;
+  },
 ) {
   try {
-    const { protocol, number } = params;
+    const { protocol, number } = await params;
 
     if (!protocol || !number) {
       return NextResponse.json(

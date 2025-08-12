@@ -17,7 +17,7 @@ import { RepositoryConfig } from "./types";
 const OctokitWithPlugins = Octokit.plugin(restEndpointMethods)
   .plugin(throttling)
   .plugin(paginateRest)
-  .plugin(retry);
+  .plugin(retry as any);
 export type OctokitClient = InstanceType<typeof OctokitWithPlugins>;
 
 // --- Configuration ---

@@ -18,15 +18,17 @@ exports.prisma = void 0;
 const client_1 = require("@prisma/client");
 const prismaSingleton = () => {
     return new client_1.PrismaClient({
-        log: process.env.NODE_ENV === "development"
-            ? ["error", "warn"]
-            : ["error"],
+        log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
     });
 };
 exports.prisma = global.prisma ?? prismaSingleton();
 if (process.env.NODE_ENV !== "production") {
     global.prisma = exports.prisma;
 }
+// Re-export all the types from the generated client.
+// This allows other packages to import types like `User`, `Proposal`, etc.,
+// directly from this `database` package, creating a shared type contract.
+__exportStar(require("@prisma/client"), exports);
 // Re-export all the types from the generated client.
 // This allows other packages to import types like `User`, `Proposal`, etc.,
 // directly from this `database` package.

@@ -11,10 +11,7 @@ declare global {
 
 const prismaSingleton = () => {
   return new PrismaClient({
-    log:
-      process.env.NODE_ENV === "development"
-        ? ["error", "warn"]
-        : ["error"],
+    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
 };
 
@@ -23,6 +20,23 @@ export const prisma = global.prisma ?? prismaSingleton();
 if (process.env.NODE_ENV !== "production") {
   global.prisma = prisma;
 }
+
+// Re-export all the types from the generated client.
+// This allows other packages to import types like `User`, `Proposal`, etc.,
+// directly from this `database` package, creating a shared type contract.
+export * from "@prisma/client";
+
+// Define and export the shared data type for the Authors API
+export type AuthorStats = {
+  id: string;
+  name: string | null;
+  githubHandle: string | null;
+  email: string | null;
+  totalContributions: number;
+  finalizedContributions: number;
+  contributionByRepo: Record<string, number>;
+  influenceScore: number | null;
+};
 
 // Re-export all the types from the generated client.
 // This allows other packages to import types like `User`, `Proposal`, etc.,
