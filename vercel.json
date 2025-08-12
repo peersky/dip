@@ -1,15 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "version": 2,
   "build": {
     "env": {
       "ENABLE_EXPERIMENTAL_COREPACK": "1"
     }
   },
-  "builds": [
-    {
-      "src": "frontend/next.config.ts",
-      "use": "@vercel/next"
-    }
-  ]
+  "installCommand": "pnpm install",
+  "buildCommand": "pnpm --filter @peeramid-labs/dip-database build && pnpm --filter @peeramid-labs/dip-core build && pnpm --filter happy-birthday build",
+  "outputDirectory": "frontend/.next"
 }
