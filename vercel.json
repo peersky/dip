@@ -1,14 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "version": 2,
-  "framework": "nextjs",
   "build": {
     "env": {
       "ENABLE_EXPERIMENTAL_COREPACK": "1"
     }
   },
   "installCommand": "pnpm install",
-  "buildCommand": "pnpm turbo build --filter=happy-birthday",
-  "builds": [{ "src": "frontend/package.json", "use": "@vercel/next" }],
-  "routes": [{ "src": "/(.*)", "dest": "frontend/$1" }]
+  "buildCommand": "pnpm build",
+  "outputDirectory": "frontend/.next"
 }
