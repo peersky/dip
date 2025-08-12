@@ -1,4 +1,5 @@
 /** @type {import('next').NextConfig} */
+const { PrismaPlugin } = require("@prisma/nextjs-monorepo-workaround-plugin");
 
 const cspHeader = `
                     default-src 'self';
@@ -54,6 +55,12 @@ export default {
       config.resolve.fallback.fs = false;
       config.resolve.fallback.electron = false;
     }
+
+    // Add Prisma plugin for server builds
+    if (isServer) {
+      config.plugins.push(new PrismaPlugin());
+    }
+
     config.plugins.push(
       new webpack.IgnorePlugin({
         resourceRegExp: /^electron$/,
@@ -77,6 +84,12 @@ export default {
     externalDir: true,
     optimizePackageImports: ["@mantine/core", "@mantine/hooks"],
     serverComponentsExternalPackages: ["@prisma/client", "prisma"],
+  },
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.plugins = [...config.plugins, new PrismaPlugin()];
+    }
+    return config;
   },
   transpilePackages: ["@peeramid-labs/dip-database"],
 };

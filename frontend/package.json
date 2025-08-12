@@ -6,12 +6,13 @@
   "scripts": {
     "dev": "next dev",
     "dev:mainnet": "node ./dev-mainnet.js",
-    "prebuild": "cd ../packages/database && pnpm prisma generate",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
     "nice": "next lint",
-    "dev:tunnel": "concurrently \"npm run dev\" \"ngrok http 3000\""
+    "dev:tunnel": "concurrently \"npm run dev\" \"ngrok http 3000\"",
+    "postinstall": "prisma generate",
+    "db:generate": "prisma generate"
   },
   "dependencies": {
     "@emotion/css": "^11.13.5",
@@ -28,7 +29,6 @@
     "@octokit/plugin-rest-endpoint-methods": "^16.0.0",
     "@octokit/plugin-throttling": "^11.0.1",
     "@peeramid-labs/dip-core": "workspace:*",
-    "@peeramid-labs/dip-database": "workspace:*",
     "@privy-io/react-auth": "^2.8.2",
     "@privy-io/server-auth": "^1.19.3",
     "@privy-io/wagmi": "^1.0.3",
@@ -67,7 +67,8 @@
     "sanitize-html": "^2.15.0",
     "turndown": "^7.2.0",
     "viem": "2.x",
-    "wagmi": "^2.14.15"
+    "wagmi": "^2.14.15",
+    "@prisma/client": "^5.22.0"
   },
   "devDependencies": {
     "@babel/core": "^7.26.10",
@@ -85,6 +86,8 @@
     "postcss-preset-mantine": "^1.17.0",
     "postcss-simple-vars": "^7.0.1",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "prisma": "^5.22.0",
+    "@prisma/nextjs-monorepo-workaround-plugin": "^5.22.0"
   }
 }

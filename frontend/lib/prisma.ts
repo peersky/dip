@@ -1,12 +1,25 @@
-/**
- * This file acts as the single entry point for the Prisma client in the frontend application.
- *
- * It imports the pre-instantiated, singleton `prisma` client directly from our
- * shared `@peeramid-labs/dip-database` package. This is a critical best practice
- * in a monorepo, as it ensures that the entire application (both frontend and backend)
- * shares the exact same database client instance, preventing connection pool issues
- * and ensuring consistent type inference.
- */
-import { prisma } from "@peeramid-labs/dip-database";
+import { PrismaClient } from "@prisma/client";
 
-export { prisma };
+// This pattern ensures that a single instance of PrismaClient is used across the application,
+// preventing the exhaustion of database connections, especially in serverless or hot-reloading environments.
+
+declare global {
+  // Allow global `var` declarations
+  // eslint-disable-next-line no-var
+  var prisma: PrismaClient | undefined;
+}
+
+const prismaSingleton = () => {
+  return new PrismaClient({
+    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+  });
+};
+
+export const prisma = global.prisma ?? prismaSingleton();
+
+if (process.env.NODE_ENV !== "production") {
+  global.prisma = prisma;
+}
+
+// Re-export all the types from the generated client
+export * from "@prisma/client";
