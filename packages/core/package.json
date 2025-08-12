@@ -6,7 +6,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsc",
+    "build": "tsc --build",
     "db:regenerate-history": "ts-node -r dotenv/config src/runners/regenerateSnapshots.ts",
     "db:write-frontmatter-fix": "ts-node src/writeDataFixMigrationV2.ts"
   },

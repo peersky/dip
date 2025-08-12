@@ -9,7 +9,6 @@
     "db:migrate": "pnpm --filter @peeramid-labs/dip-database db:migrate"
   },
   "devDependencies": {
-    "turbo": "^2.5.5",
     "typescript": "^5.3.3"
   },
   "packageManager": "pnpm@10.6.5",

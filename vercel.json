@@ -1,11 +1,15 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
   "build": {
     "env": {
       "ENABLE_EXPERIMENTAL_COREPACK": "1"
     }
   },
-  "installCommand": "pnpm install",
-  "buildCommand": "pnpm build",
-  "outputDirectory": "frontend/.next"
+  "builds": [
+    {
+      "src": "frontend/next.config.ts",
+      "use": "@vercel/next"
+    }
+  ]
 }
