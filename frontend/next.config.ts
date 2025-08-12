@@ -43,18 +43,8 @@ export default {
       );
     }
 
-    // Ensure local workspace packages resolve during Next build on Vercel
-    config.resolve.alias = {
-      ...(config.resolve.alias || {}),
-      "@peeramid-labs/dip-database$": path.resolve(
-        __dirname,
-        "../packages/database/dist/index.js",
-      ),
-      "@peeramid-labs/dip-core$": path.resolve(
-        __dirname,
-        "../packages/core/dist/index.js",
-      ),
-    };
+    // Remove workspace package aliases - let transpilePackages handle them
+    // config.resolve.alias is managed by Next.js for workspace packages
 
     // Fixes npm packages that depend on `fs` module
     if (!isServer) {
