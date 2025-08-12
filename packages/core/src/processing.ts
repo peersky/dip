@@ -1,5 +1,10 @@
-import type { Endpoints } from "@octokit/types";
+import { Octokit } from "@octokit/core";
+import { restEndpointMethods } from "@octokit/plugin-rest-endpoint-methods";
+import { throttling } from "@octokit/plugin-throttling";
+import { paginateRest } from "@octokit/plugin-paginate-rest";
+import { retry } from "@octokit/plugin-retry";
 import { prisma } from "@peeramid-labs/dip-database";
+import { Endpoints } from "@octokit/types";
 import crypto from "crypto";
 import matter from "gray-matter";
 import path from "path";
@@ -7,16 +12,13 @@ import { getParser } from "./parsers";
 import { RepositoryConfig } from "./types";
 
 // --- Type Definition ---
-// Stable client surface to avoid leaking non-portable Octokit composite types
-export interface OctokitClient {
-  rest: {
-    repos: {
-      getCommit: (params: Endpoints["GET /repos/{owner}/{repo}/commits/{ref}"]["parameters"]) => Promise<Endpoints["GET /repos/{owner}/{repo}/commits/{ref}"]["response"]>;
-      getContent: (params: Endpoints["GET /repos/{owner}/{repo}/contents/{path}"]["parameters"]) => Promise<Endpoints["GET /repos/{owner}/{repo}/contents/{path}"]["response"]>;
-    };
-  };
-  paginate: <R = unknown>(route: string, parameters?: unknown) => Promise<R>;
-}
+// This is the correct way to define the type for the Octokit client that this library expects.
+// The application (crawler) will be responsible for creating an instance of this type.
+const OctokitWithPlugins = Octokit.plugin(restEndpointMethods)
+  .plugin(throttling)
+  .plugin(paginateRest)
+  .plugin(retry as any);
+export type OctokitClient = InstanceType<typeof OctokitWithPlugins>;
 
 // --- Configuration ---
 export const repositories: RepositoryConfig[] = [
@@ -953,59 +955,68 @@ async function aggregateAndStoreForMonth(dateForMonth: Date) {
   const year = dateForMonth.getUTCFullYear();
   const month = dateForMonth.getUTCMonth() + 1;
   console.log(`-> Aggregating global statistics for ${year}-${month}`);
+
   const monthlySnapshots = await prisma.protocolStatsSnapshot.findMany({
-    where: {
-      year: year,
-      month: month,
-    },
+    where: { year, month },
   });
+
   if (monthlySnapshots.length === 0) {
     console.log(`   No protocol snapshots found for ${year}-${month} to aggregate.`);
     return;
   }
-  const globalStats = monthlySnapshots.reduce(
-    (
-      acc: {
-        totalProposals: number;
-        distinctAuthorsCount: number;
-        authorsOnFinalizedCount: number;
-      },
-      snapshot: any
-    ) => {
-      acc.totalProposals += snapshot.totalProposals;
-      acc.distinctAuthorsCount += snapshot.distinctAuthorsCount;
-      acc.authorsOnFinalizedCount += snapshot.authorsOnFinalizedCount;
-      return acc;
-    },
-    {
-      totalProposals: 0,
-      distinctAuthorsCount: 0,
-      authorsOnFinalizedCount: 0,
-    }
-  );
-  const acceptanceRate = globalStats.distinctAuthorsCount > 0 ? globalStats.authorsOnFinalizedCount / globalStats.distinctAuthorsCount : 0;
-  const centralizationRate = 1 - acceptanceRate;
-  const snapshotDate = new Date(Date.UTC(year, month, 0));
-  const globalSnapshotData = {
-    snapshotDate: snapshotDate,
-    year: year,
-    month: month,
-    totalProposals: globalStats.totalProposals,
-    distinctAuthorsCount: globalStats.distinctAuthorsCount,
-    authorsOnFinalizedCount: globalStats.authorsOnFinalizedCount,
-    acceptanceRate: acceptanceRate,
-    centralizationRate: centralizationRate,
+
+  // --- Aggregate Raw Counts ---
+  const proposalCounts = {
+    finalized: 0,
+    withdrawn: 0,
+    stagnant: 0,
+    total: 0,
   };
+
+  const authorCounts = {
+    distinct: 0,
+    onFinalized: 0,
+  };
+
+  for (const snapshot of monthlySnapshots) {
+    const statusCounts = snapshot.statusCounts as { [key: string]: number };
+    proposalCounts.finalized += statusCounts["Final"] || 0;
+    proposalCounts.withdrawn += statusCounts["Withdrawn"] || 0;
+    proposalCounts.stagnant += statusCounts["Stagnant"] || 0;
+    proposalCounts.total += snapshot.totalProposals;
+
+    authorCounts.distinct += snapshot.distinctAuthorsCount;
+    authorCounts.onFinalized += snapshot.authorsOnFinalizedCount;
+  }
+
+  // --- Calculate Definitive Metrics ---
+
+  // 1. Proposal-centric Acceptance Rate
+  const eligibleProposals = proposalCounts.total - proposalCounts.withdrawn - proposalCounts.stagnant;
+  const acceptanceRate = eligibleProposals > 0 ? (proposalCounts.finalized / eligibleProposals) * 100 : 0;
+
+  // 2. Author-centric Centralization Score
+  const centralizationRate = authorCounts.distinct > 0 ? (1 - authorCounts.onFinalized / authorCounts.distinct) * 100 : 0;
+
+  // --- Save to Database ---
+  const snapshotDate = new Date(Date.UTC(year, month - 1, 1));
+  const globalSnapshotData = {
+    snapshotDate,
+    year,
+    month,
+    totalProposals: proposalCounts.total,
+    distinctAuthorsCount: authorCounts.distinct,
+    authorsOnFinalizedCount: authorCounts.onFinalized,
+    acceptanceRate: parseFloat(acceptanceRate.toFixed(2)),
+    centralizationRate: parseFloat(centralizationRate.toFixed(2)),
+  };
+
   await prisma.globalStatsSnapshot.upsert({
-    where: {
-      year_month: {
-        year: year,
-        month: month,
-      },
-    },
+    where: { year_month: { year, month } },
     update: globalSnapshotData,
     create: globalSnapshotData,
   });
+
   console.log(`   Successfully stored global statistics snapshot for ${year}-${month}.`);
 }
 
