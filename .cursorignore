@@ -1,0 +1,8 @@
+.env
+*.env
+.secrets
+.DS_Store
+node_modules/
+EIPs/
+Polygon-Improvement-Proposals/
+*.pem

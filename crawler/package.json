@@ -1,0 +1,43 @@
+{
+  "name": "ip-crawler",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cron service for processing improvement proposals.",
+  "main": "src/ip-crawler.ts",
+  "scripts": {
+    "start": "ts-node -r dotenv/config src/ip-crawler.ts",
+    "dev": "ts-node-dev --respawn --transpile-only src/ip-crawler.ts",
+    "build": "tsc --build",
+    "generate-snapshots": "ts-node -r dotenv/config src/generate-historical-snapshots.ts",
+    "inspect-proposals": "ts-node -r dotenv/config src/inspect-proposals.ts",
+    "db:dedup-authors": "ts-node -r dotenv/config src/merge-duplicate-authors.ts",
+    "db:dedup-authors-v2": "ts-node -r dotenv/config src/merge-duplicate-authors-v2.ts",
+    "db:dedup-authors-v3": "ts-node -r dotenv/config src/merge-duplicate-authors-v3.ts",
+    "db:dedup-authors-v4": "ts-node -r dotenv/config src/merge-duplicate-authors-v4.ts",
+    "db:dedup-authors-v5": "ts-node -r dotenv/config src/merge-duplicate-authors-v5.ts",
+    "db:reset-crawl-status": "ts-node -r dotenv/config src/reset-crawl-status.ts",
+    "test:parsers": "ts-node -r dotenv/config src/validate-local-parsers.ts",
+    "db:merge-erc-histories": "ts-node -r dotenv/config src/merge-erc-histories.ts"
+  },
+  "dependencies": {
+    "@octokit/core": "^7.0.3",
+    "@octokit/plugin-paginate-rest": "^13.1.1",
+    "@octokit/plugin-rest-endpoint-methods": "^16.0.0",
+    "@octokit/plugin-retry": "^8.0.1",
+    "@octokit/plugin-throttling": "^11.0.0",
+    "@peeramid-labs/dip-core": "workspace:*",
+    "@peeramid-labs/dip-database": "workspace:*",
+    "dotenv": "^16.3.1",
+    "gray-matter": "^4.0.3"
+  },
+  "devDependencies": {
+    "@octokit/types": "^14.1.0",
+    "@types/jest": "^29.5.12",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.11.24",
+    "js-yaml": "^4.1.0",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "2.0.0",
+    "typescript": "^5.3.3"
+  }
+}

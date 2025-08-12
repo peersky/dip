@@ -1,0 +1,1 @@
+export DATABASE_URL="postgresql://neondb_owner:npg_Li12MkhPNGKm@ep-cold-moon-a10npr83.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"

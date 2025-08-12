@@ -1,0 +1,35 @@
+{
+  "name": "@peeramid-labs/dip-core",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc --build",
+    "db:regenerate-history": "ts-node -r dotenv/config src/runners/regenerateSnapshots.ts",
+    "db:write-frontmatter-fix": "ts-node src/writeDataFixMigrationV2.ts"
+  },
+  "dependencies": {
+    "@peeramid-labs/dip-database": "workspace:*",
+    "@octokit/core": "^7.0.0",
+    "dotenv": "^16.3.1",
+    "gray-matter": "^4.0.3",
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "@octokit/plugin-paginate-rest": "^13.1.1",
+    "@octokit/plugin-rest-endpoint-methods": "^16.0.0",
+    "@octokit/plugin-retry": "^8.0.1",
+    "@octokit/plugin-throttling": "^11.0.0",
+    "@octokit/types": "^14.1.0",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.11.24",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  },
+  "peerDependencies": {
+    "@octokit/core": "^7.0.3",
+    "@octokit/types": "^14.1.0"
+  }
+}

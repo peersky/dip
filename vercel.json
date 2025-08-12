@@ -1,13 +1,7 @@
 {
-  "framework": "nextjs",
-  "buildCommand": "pnpm run build",
-  "devCommand": "pnpm run dev",
-  "installCommand": "pnpm install",
-  "regions": ["iad1"],
-  "crons": [
-    {
-      "path": "/api/cron/generate-static",
-      "schedule": "0 0 * * *"
-    }
-  ]
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "installCommand": "cd .. && pnpm install && cd packages/database && pnpm prisma generate",
+  "buildCommand": "cd .. && pnpm --filter @peeramid-labs/dip-database build && cd frontend && pnpm run build",
+  "outputDirectory": ".next"
 }
