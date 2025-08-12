@@ -22,6 +22,13 @@ export default {
   reactStrictMode: false,
   trailingSlash: false,
   output: "standalone",
+  serverComponentsExternalPackages: ["@prisma/client", "prisma"],
+  env: {
+    PRISMA_QUERY_ENGINE_LIBRARY:
+      "./node_modules/.prisma/client/libquery_engine-rhel-openssl-3.0.x.so.node",
+    PRISMA_QUERY_ENGINE_BINARY:
+      "./node_modules/.prisma/client/query-engine-rhel-openssl-3.0.x",
+  },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   webpack: (
     config: any,
@@ -53,6 +60,13 @@ export default {
       config.resolve.fallback.fs = false;
       config.resolve.fallback.electron = false;
     }
+
+    // Copy Prisma query engine for serverless deployment
+    if (isServer) {
+      config.externals.push({
+        "@prisma/client": "@prisma/client",
+      });
+    }
     config.plugins.push(
       new webpack.IgnorePlugin({
         resourceRegExp: /^electron$/,
@@ -75,6 +89,7 @@ export default {
   experimental: {
     externalDir: true,
     optimizePackageImports: ["@mantine/core", "@mantine/hooks"],
+    serverComponentsExternalPackages: ["@prisma/client", "prisma"],
   },
   transpilePackages: ["@peeramid-labs/dip-database"],
 };

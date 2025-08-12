@@ -12,13 +12,26 @@ declare global {
 const prismaSingleton = () => {
   return new PrismaClient({
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+    // Add configuration for serverless environments
+    datasources: {
+      db: {
+        url: process.env.DATABASE_URL,
+      },
+    },
+    // Ensure proper engine handling in serverless
+    __internal: {
+      engine: {
+        binaryPath: process.env.PRISMA_QUERY_ENGINE_BINARY,
+        libraryPath: process.env.PRISMA_QUERY_ENGINE_LIBRARY,
+      },
+    },
   });
 };
 
-export const prisma = global.prisma ?? prismaSingleton();
+export const prisma = globalThis.prisma ?? prismaSingleton();
 
 if (process.env.NODE_ENV !== "production") {
-  global.prisma = prisma;
+  globalThis.prisma = prisma;
 }
 
 // Re-export all the types from the generated client.
