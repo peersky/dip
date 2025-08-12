@@ -328,14 +328,14 @@ importers:
   packages/database:
     dependencies:
       '@prisma/client':
-        specifier: ^5.10.2
+        specifier: ^5.22.0
         version: 5.22.0(prisma@5.22.0)
     devDependencies:
       '@types/node':
         specifier: ^24.2.0
         version: 24.2.1
       prisma:
-        specifier: ^5.10.2
+        specifier: ^5.22.0
         version: 5.22.0
       typescript:
         specifier: ^5.3.3
@@ -14337,7 +14337,7 @@ snapshots:
 
   extension-port-stream@3.0.0:
     dependencies:
-      readable-stream: 3.6.2
+      readable-stream: 4.7.0
       webextension-polyfill: 0.10.0
 
   eyes@0.1.8: {}
