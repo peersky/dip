@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, ProtocolStatsSnapshot } from "@prisma/client";
 
 // This pattern ensures that a single instance of PrismaClient is used across the application,
 // preventing the exhaustion of database connections, especially in serverless or hot-reloading environments.
@@ -25,6 +25,10 @@ if (process.env.NODE_ENV !== "production") {
 // This allows other packages to import types like `User`, `Proposal`, etc.,
 // directly from this `database` package, creating a shared type contract.
 export * from "@prisma/client";
+
+// Explicitly re-export model types to ensure they are available in the package's
+// final type definition files, which is critical for Vercel builds.
+export type { ProtocolStatsSnapshot };
 
 // Define and export the shared data type for the Authors API
 export type AuthorStats = {
