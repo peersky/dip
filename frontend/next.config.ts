@@ -46,8 +46,14 @@ export default {
     // Ensure local workspace packages resolve during Next build on Vercel
     config.resolve.alias = {
       ...(config.resolve.alias || {}),
-      "@peeramid-labs/dip-database": path.join(__dirname, "../packages/database/dist"),
-      "@peeramid-labs/dip-core": path.join(__dirname, "../packages/core/dist"),
+      "@peeramid-labs/dip-database$": path.resolve(
+        __dirname,
+        "../packages/database/dist/index.js",
+      ),
+      "@peeramid-labs/dip-core$": path.resolve(
+        __dirname,
+        "../packages/core/dist/index.js",
+      ),
     };
 
     // Fixes npm packages that depend on `fs` module
