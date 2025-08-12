@@ -76,6 +76,9 @@ export default function RootLayout({
                     >
                       Maintainers
                     </Button>
+                    <Button component={Link} href="/faq" variant="default">
+                      About / FAQ
+                    </Button>
                   </Group>
                 </Group>
               </AppShell.Header>

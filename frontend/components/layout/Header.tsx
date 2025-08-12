@@ -17,7 +17,9 @@ export const Header: React.FC<HeaderProps> = ({ opened, toggle }) => {
 
   const goToMainPage = () => {
     // Navigate to the main overview page
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || (process.env.NODE_ENV === "development" ? "localhost:3000" : "dip.box");
+    const baseUrl =
+      process.env.NEXT_PUBLIC_BASE_URL ||
+      (process.env.NODE_ENV === "development" ? "localhost:3000" : "dip.box");
     const protocol = process.env.NODE_ENV === "development" ? "http://" : "";
     window.location.href = `${baseUrl}`;
   };
@@ -34,10 +36,8 @@ export const Header: React.FC<HeaderProps> = ({ opened, toggle }) => {
   return (
     <Group h="100%" px="md" justify="space-between">
       <Group>
-      <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
-      <Title order={3}>
-        {protocolConfig.name} Improvements
-      </Title>
+        <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+        <Title order={3}>{protocolConfig.name}</Title>
       </Group>
       <Button
         variant="light"

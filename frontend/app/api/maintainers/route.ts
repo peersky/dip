@@ -15,22 +15,34 @@ export async function GET() {
     // Repository object that are linked to each maintainer entry. This provides
     // all the necessary data to the frontend in a single query.
     const maintainers = await prisma.maintainer.findMany({
-      include: {
-        author: true, // Include the full author details
-        repository: true, // Include the full repository details
+      select: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            githubHandle: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        repository: true,
+        authorId: true,
+        repositoryOwner: true,
+        repositoryRepo: true,
+        repositoryProtocol: true,
       },
       orderBy: [
         {
           repository: {
-            protocol: 'asc'
-          }
+            protocol: "asc",
+          },
         },
         {
           author: {
-            name: 'asc'
-          }
-        }
-      ]
+            name: "asc",
+          },
+        },
+      ],
     });
 
     return NextResponse.json({

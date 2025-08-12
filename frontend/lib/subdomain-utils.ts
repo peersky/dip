@@ -97,12 +97,12 @@ export function getProtocolConfig(protocol: string) {
     }
   > = {
     main: {
-      name: "Decentralised",
+      name: "DIP",
       repoOwner: "decentralised",
       repoName: "DIPs",
       defaultBranch: "main",
       proposalPrefix: "DIP",
-      description: "Decentralised Improvement Protocols",
+      description: "DIPs",
       color: "gray",
       subdomain: "main",
     },
