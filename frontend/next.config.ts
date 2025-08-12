@@ -85,11 +85,5 @@ export default {
     optimizePackageImports: ["@mantine/core", "@mantine/hooks"],
     serverComponentsExternalPackages: ["@prisma/client", "prisma"],
   },
-  webpack: (config, { isServer }) => {
-    if (isServer) {
-      config.plugins = [...config.plugins, new PrismaPlugin()];
-    }
-    return config;
-  },
   transpilePackages: ["@peeramid-labs/dip-database"],
 };
