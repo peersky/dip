@@ -47,49 +47,47 @@ export async function GET(
 
     // Transform the raw snapshot data into a format suitable for time series charts,
     // applying the final, correct metric definitions.
-    const timeSeriesData = historicalSnapshots.map(
-      (snapshot: ProtocolStatsSnapshot) => {
-        // --- PROPOSAL-CENTRIC ACCEPTANCE RATE ---
-        // As per user definition: Finalized / (Total - Withdrawn - Stagnant)
-        const statusCounts = snapshot.statusCounts as Record<string, number>;
-        const finalizedCount =
-          (statusCounts["Final"] || 0) + (statusCounts["Living"] || 0);
-        const withdrawnCount = statusCounts["Withdrawn"] || 0;
-        const stagnantCount = statusCounts["Stagnant"] || 0;
+    const timeSeriesData = historicalSnapshots.map((snapshot) => {
+      // --- PROPOSAL-CENTRIC ACCEPTANCE RATE ---
+      // As per user definition: Finalized / (Total - Withdrawn - Stagnant)
+      const statusCounts = snapshot.statusCounts as Record<string, number>;
+      const finalizedCount =
+        (statusCounts["Final"] || 0) + (statusCounts["Living"] || 0);
+      const withdrawnCount = statusCounts["Withdrawn"] || 0;
+      const stagnantCount = statusCounts["Stagnant"] || 0;
 
-        // Note: `snapshot.totalProposals` from the DB already excludes moved/deleted proposals.
-        const eligibleProposals =
-          snapshot.totalProposals - withdrawnCount - stagnantCount;
+      // Note: `snapshot.totalProposals` from the DB already excludes moved/deleted proposals.
+      const eligibleProposals =
+        snapshot.totalProposals - withdrawnCount - stagnantCount;
 
-        const acceptanceRate =
-          eligibleProposals > 0 ? finalizedCount / eligibleProposals : 0;
+      const acceptanceRate =
+        eligibleProposals > 0 ? finalizedCount / eligibleProposals : 0;
 
-        // --- AUTHOR-CENTRIC CENTRALIZATION RATE ---
-        // As per user definition: 1 - (Finalized Authors / Eligible Authors)
-        // Note: `distinctAuthorsCount` from the DB already represents authors of eligible (non-withdrawn/stagnant) proposals.
-        const eligibleAuthors = snapshot.distinctAuthorsCount;
-        const finalizedAuthors = snapshot.authorsOnFinalizedCount;
+      // --- AUTHOR-CENTRIC CENTRALIZATION RATE ---
+      // As per user definition: 1 - (Finalized Authors / Eligible Authors)
+      // Note: `distinctAuthorsCount` from the DB already represents authors of eligible (non-withdrawn/stagnant) proposals.
+      const eligibleAuthors = snapshot.distinctAuthorsCount;
+      const finalizedAuthors = snapshot.authorsOnFinalizedCount;
 
-        const authorSuccessRatio =
-          eligibleAuthors > 0 ? finalizedAuthors / eligibleAuthors : 0;
-        const centralizationRate = 1 - authorSuccessRatio;
+      const authorSuccessRatio =
+        eligibleAuthors > 0 ? finalizedAuthors / eligibleAuthors : 0;
+      const centralizationRate = 1 - authorSuccessRatio;
 
-        // --- AUTHOR EFFICIENCY ---
-        const proposalsPerAuthor =
-          snapshot.distinctAuthorsCount > 0
-            ? snapshot.totalProposals / snapshot.distinctAuthorsCount
-            : 0;
+      // --- AUTHOR EFFICIENCY ---
+      const proposalsPerAuthor =
+        snapshot.distinctAuthorsCount > 0
+          ? snapshot.totalProposals / snapshot.distinctAuthorsCount
+          : 0;
 
-        return {
-          date: `${snapshot.year}-${String(snapshot.month).padStart(2, "0")}`,
-          totalProposals: snapshot.totalProposals,
-          distinctAuthors: snapshot.distinctAuthorsCount,
-          acceptanceRate: parseFloat((acceptanceRate * 100).toFixed(2)),
-          centralizationRate: parseFloat((centralizationRate * 100).toFixed(2)),
-          proposalsPerAuthor: parseFloat(proposalsPerAuthor.toFixed(2)),
-        };
-      },
-    );
+      return {
+        date: `${snapshot.year}-${String(snapshot.month).padStart(2, "0")}`,
+        totalProposals: snapshot.totalProposals,
+        distinctAuthors: snapshot.distinctAuthorsCount,
+        acceptanceRate: parseFloat((acceptanceRate * 100).toFixed(2)),
+        centralizationRate: parseFloat((centralizationRate * 100).toFixed(2)),
+        proposalsPerAuthor: parseFloat(proposalsPerAuthor.toFixed(2)),
+      };
+    });
 
     return NextResponse.json({
       success: true,
