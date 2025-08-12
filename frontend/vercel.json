@@ -1,7 +1,5 @@
 {
-  "framework": "nextjs",
-  "buildCommand": "pnpm run build",
-  "devCommand": "pnpm run dev",
-  "installCommand": "pnpm install",
-  "regions": ["iad1"]
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "installCommand": "cd .. && pnpm install && pnpm -w --filter @peeramid-labs/dip-database build && pnpm -w --filter @peeramid-labs/dip-core build && cd frontend"
 }
