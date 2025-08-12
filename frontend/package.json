@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "next dev",
     "dev:mainnet": "node ./dev-mainnet.js",
-    "prebuild": "pnpm -w --filter @peeramid-labs/dip-database build && pnpm -w --filter @peeramid-labs/dip-core build",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
