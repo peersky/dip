@@ -146,7 +146,7 @@ function ProtocolRow({ protocol }: { protocol: ProtocolStats }) {
             label={governanceTooltip}
             withArrow
             multiline
-            width={300}
+            w={300}
             transitionProps={{ transition: "fade", duration: 200 }}
           >
             <Group gap={4} justify="center">
