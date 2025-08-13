@@ -87,12 +87,11 @@ function ProtocolRow({ protocol }: { protocol: ProtocolStats }) {
         decentralized elements.
       </Text>
       <Text size="xs">
-        - <strong>DAO:</strong> Fully decentralized governance by token
-        holders.
+        - <strong>DAO:</strong> Fully decentralized governance by token holders.
       </Text>
       <Text size="xs" pt="xs">
-        The `>>` indicates a dependency relationship, where the left side
-        influences the right.
+        {`The >> indicates a dependency relationship, where the left side
+          influences the right.`}
       </Text>
     </Stack>
   );
@@ -120,8 +119,8 @@ function ProtocolRow({ protocol }: { protocol: ProtocolStats }) {
     centralizationRatePercent > 70
       ? "red"
       : centralizationRatePercent > 40
-      ? "orange"
-      : "green";
+        ? "orange"
+        : "green";
 
   return (
     <Table.Tr>
