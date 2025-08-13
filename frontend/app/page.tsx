@@ -17,6 +17,7 @@ import {
   Tabs,
   RingProgress,
   Table,
+  Tooltip,
 } from "@mantine/core";
 import {
   IconChartBar,
@@ -24,6 +25,7 @@ import {
   IconExternalLink,
   IconTimeline,
   IconHelpCircle,
+  IconChevronRight,
 } from "@tabler/icons-react";
 import { useState, useEffect } from "react";
 import NextLink from "next/link";
@@ -33,7 +35,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   Legend,
   ResponsiveContainer,
   LineChart,
@@ -59,6 +61,55 @@ function ProtocolRow({ protocol }: { protocol: ProtocolStats }) {
   const theme = useMantineTheme();
   const protocolConfig = getProtocolConfig(protocol.protocol);
 
+  // Governance data as per requirements
+  const governanceInfo: {
+    [key: string]: { type: string; dependency?: string };
+  } = {
+    ethereum: { type: "Foundation" },
+    rollup: { type: "Foundation", dependency: "Foundation" },
+    polygon: { type: "Hybrid", dependency: "Foundation" },
+    starknet: { type: "Hybrid", dependency: "Foundation" },
+    arbitrum: { type: "Foundation", dependency: "Foundation" },
+  };
+
+  const governance = governanceInfo[protocol.protocol];
+
+  const governanceTooltip = (
+    <Stack gap="xs">
+      <Text size="sm" fw={500}>
+        Governance Models
+      </Text>
+      <Text size="xs">
+        - <strong>Foundation:</strong> Governed by a non-profit foundation.
+      </Text>
+      <Text size="xs">
+        - <strong>Hybrid:</strong> A mix of non-profit entities and
+        decentralized elements.
+      </Text>
+      <Text size="xs">
+        - <strong>DAO:</strong> Fully decentralized governance by token
+        holders.
+      </Text>
+      <Text size="xs" pt="xs">
+        The `>>` indicates a dependency relationship, where the left side
+        influences the right.
+      </Text>
+    </Stack>
+  );
+
+  const getBadgeColor = (type: string) => {
+    switch (type) {
+      case "Foundation":
+        return "blue";
+      case "Hybrid":
+        return "orange";
+      case "DAO":
+        return "green";
+      default:
+        return "gray";
+    }
+  };
+
   const handleNavigate = () => {
     const url = getProtocolUrl(protocol.protocol);
     window.location.href = url;
@@ -69,8 +120,8 @@ function ProtocolRow({ protocol }: { protocol: ProtocolStats }) {
     centralizationRatePercent > 70
       ? "red"
       : centralizationRatePercent > 40
-        ? "orange"
-        : "green";
+      ? "orange"
+      : "green";
 
   return (
     <Table.Tr>
@@ -89,6 +140,34 @@ function ProtocolRow({ protocol }: { protocol: ProtocolStats }) {
       </Table.Td>
       <Table.Td>
         <Text fw={500}>{protocol.distinctAuthorsCount.toLocaleString()}</Text>
+      </Table.Td>
+      <Table.Td>
+        {governance ? (
+          <Tooltip
+            label={governanceTooltip}
+            withArrow
+            multiline
+            width={300}
+            transitionProps={{ transition: "fade", duration: 200 }}
+          >
+            <Group gap={4} justify="center">
+              {governance.dependency && (
+                <>
+                  <Badge
+                    color={getBadgeColor(governance.dependency)}
+                    variant="light"
+                  >
+                    {governance.dependency}
+                  </Badge>
+                  <IconChevronRight size={14} />
+                </>
+              )}
+              <Badge color={getBadgeColor(governance.type)} variant="light">
+                {governance.type}
+              </Badge>
+            </Group>
+          </Tooltip>
+        ) : null}
       </Table.Td>
       <Table.Td>
         <Group gap="xs">
@@ -261,7 +340,7 @@ export default function HomePage() {
                       }}
                       domain={[0, 100]}
                     />
-                    <Tooltip />
+                    <RechartsTooltip />
                     <Legend
                       verticalAlign="top"
                       wrapperStyle={{ paddingBottom: "20px" }}
@@ -322,7 +401,7 @@ export default function HomePage() {
                     scale="log"
                     domain={["auto", "auto"]}
                   />
-                  <Tooltip />
+                  <RechartsTooltip />
                   <Legend
                     verticalAlign="top"
                     wrapperStyle={{ paddingBottom: "20px" }}
@@ -355,6 +434,7 @@ export default function HomePage() {
                   <Table.Th>Protocol</Table.Th>
                   <Table.Th>Total Proposals</Table.Th>
                   <Table.Th>Distinct Authors</Table.Th>
+                  <Table.Th>Governance Type</Table.Th>
                   <Table.Th>Centralization</Table.Th>
                   <Table.Th></Table.Th>
                 </Table.Tr>
