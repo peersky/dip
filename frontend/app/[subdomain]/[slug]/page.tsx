@@ -58,6 +58,8 @@ interface UnifiedProposal {
   enrichedRequires: { number: string; status: string }[];
   isMoved: boolean;
   originalPath?: string;
+  repositoryOwner: string;
+  repositoryRepo: string;
   versions: {
     id: string;
     commitSha: string;
@@ -470,7 +472,7 @@ export default function SubdomainSlugDetailPage() {
                             Status: {version.status}
                           </Text>
                           <Anchor
-                            href={`https://github.com/${protocolConfig.repoOwner}/${protocolConfig.repoName}/commit/${version.commitSha}`}
+                            href={`https://github.com/${proposal.repositoryOwner}/${proposal.repositoryRepo}/commit/${version.commitSha}`}
                             target="_blank"
                             size="sm"
                           >

@@ -16,6 +16,8 @@ type UnifiedProposal = Proposal & {
   versions: VersionWithAuthors[];
   isMoved: boolean; // Flag to indicate if the original request was for a moved proposal
   originalPath?: string; // If moved, what was the original path requested
+  repositoryOwner: string;
+  repositoryRepo: string;
 };
 
 interface RouteContext {
@@ -102,7 +104,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
   }
 
   // Parse the slug (e.g., "EIP-1") into a prefix ("EIP") and a number ("1").
-  const slugMatch = slug.match(/^([a-zA-Z]+)-?(\d+)$/);
+  const slugMatch = slug.match(/^([a-zA-Z]+)-?(\d+)$/i);
   if (!slugMatch) {
     return NextResponse.json(
       { success: false, error: `Invalid proposal slug format: "${slug}"` },
@@ -117,7 +119,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     const repository = await prisma.repository.findFirst({
       where: {
         protocol: protocol,
-        proposalPrefix: prefix,
+        proposalPrefix: prefix.toUpperCase(),
       },
     });
 
