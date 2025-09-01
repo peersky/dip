@@ -1,11 +1,4 @@
-import {
-  Container,
-  Group,
-  Stack,
-  Text,
-  Title,
-  Button,
-} from "@mantine/core";
+import { Container, Group, Stack, Text, Title, Button } from "@mantine/core";
 import Link from "next/link";
 import { PropsWithChildren } from "react";
 import { IconArrowLeft } from "@tabler/icons-react";
@@ -13,7 +6,10 @@ import { IconArrowLeft } from "@tabler/icons-react";
 export default function SubdomainLayout({
   children,
   params,
-}: PropsWithChildren<{ params: { subdomain: string } }>) {
+}: {
+  children: React.ReactNode;
+  params: { subdomain: string };
+}) {
   return (
     <Container size="lg" my="xl">
       <Stack gap="xl">
