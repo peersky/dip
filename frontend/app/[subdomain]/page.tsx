@@ -186,22 +186,6 @@ function SankeyView({ protocol }: { protocol: string }) {
             "links",
             "nodes",
             "labels",
-            ({ links }) => (
-              <g>
-                {links.map((link) => (
-                  <text
-                    key={link.index}
-                    x={link.source.x1 + (link.target.x0 - link.source.x1) / 2}
-                    y={(link.source.y1 + link.source.y0) / 2 + 6}
-                    dy="0.35em"
-                    textAnchor="middle"
-                    fontSize={12}
-                  >
-                    {link.value}
-                  </text>
-                ))}
-              </g>
-            ),
           ]}
           theme={{
             labels: {
