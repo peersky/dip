@@ -551,9 +551,13 @@ export default function EipForm({
       )
         errors.withdrawalReason =
           "Withdrawal Reason required for Withdrawn EIPs.";
-      if (values.requires && Array.isArray(values.requires)) {
+      if (
+        values.requires &&
+        Array.isArray(values.requires) &&
+        values.requires.length > 0
+      ) {
         for (const req of values.requires) {
-          if (typeof req !== "string" || !/^\d+$/.test(req)) {
+          if (typeof req !== "string" || !/^\d+$/.test(req.trim())) {
             errors.requires = "Requires: EIP numbers (digits only).";
             break;
           }
