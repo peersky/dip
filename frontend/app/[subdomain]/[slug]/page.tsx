@@ -597,7 +597,9 @@ export default function SubdomainSlugDetailPage() {
                     status: latestVersion.status,
                     type: proposal.type,
                     category: proposal.category || "",
-                    created: proposal.created || "",
+                    created: proposal.created
+                      ? new Date(proposal.created).toISOString().split("T")[0]
+                      : "",
                     requires: (proposal.requires || []).join(", "),
                     discussionsTo: proposal.discussionsTo || "",
                     mainContent: latestVersion.rawMarkdown,
