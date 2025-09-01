@@ -109,12 +109,18 @@ export async function seedRepositoryConfigs(): Promise<void> {
 }
 
 // --- GitHub Data Fetching ---
-async function fetchAllCommits(octokit: OctokitClient, options: Endpoints["GET /repos/{owner}/{repo}/commits"]["parameters"]): Promise<Endpoints["GET /repos/{owner}/{repo}/commits"]["response"]["data"]> {
+async function fetchAllCommits(
+  octokit: OctokitClient,
+  options: Endpoints["GET /repos/{owner}/{repo}/commits"]["parameters"],
+): Promise<Endpoints["GET /repos/{owner}/{repo}/commits"]["response"]["data"]> {
   return octokit.paginate("GET /repos/{owner}/{repo}/commits", options);
 }
 
 // --- Core Processing Logic ---
-export async function processRepository(octokit: OctokitClient, repoConfig: RepositoryConfig) {
+export async function processRepository(
+  octokit: OctokitClient,
+  repoConfig: RepositoryConfig,
+) {
   console.log(`Processing repository: ${repoConfig.owner}/${repoConfig.repo}`);
   const repository = await prisma.repository.findUnique({
     where: {
@@ -134,7 +140,9 @@ export async function processRepository(octokit: OctokitClient, repoConfig: Repo
   });
   let newCommits = allCommits;
   if (lastCrawledCommitSha) {
-    const lastCrawledIndex = allCommits.findIndex((c) => c.sha === lastCrawledCommitSha);
+    const lastCrawledIndex = allCommits.findIndex(
+      (c) => c.sha === lastCrawledCommitSha,
+    );
     if (lastCrawledIndex !== -1) {
       newCommits = allCommits.slice(0, lastCrawledIndex);
     }
@@ -163,7 +171,11 @@ export async function processRepository(octokit: OctokitClient, repoConfig: Repo
   }
 }
 
-async function processCommit(octokit: OctokitClient, repoConfig: RepositoryConfig, commitSummary: Endpoints["GET /repos/{owner}/{repo}/commits"]["response"]["data"][0]) {
+async function processCommit(
+  octokit: OctokitClient,
+  repoConfig: RepositoryConfig,
+  commitSummary: Endpoints["GET /repos/{owner}/{repo}/commits"]["response"]["data"][0],
+) {
   console.log(`Processing commit: ${commitSummary.sha}`);
   const { data: commit } = await octokit.rest.repos.getCommit({
     owner: repoConfig.owner,
@@ -192,8 +204,13 @@ async function processCommit(octokit: OctokitClient, repoConfig: RepositoryConfi
             const existingAuthorByEmail = await tx.author.findUnique({
               where: { email },
             });
-            if (existingAuthorByEmail && existingAuthorByEmail.id !== dbAuthor.id) {
-              console.warn(`Could not update email for author ${dbAuthor.name || dbAuthor.githubHandle} to ${email} as it's already taken.`);
+            if (
+              existingAuthorByEmail &&
+              existingAuthorByEmail.id !== dbAuthor.id
+            ) {
+              console.warn(
+                `Could not update email for author ${dbAuthor.name || dbAuthor.githubHandle} to ${email} as it's already taken.`,
+              );
             } else {
               updateData.email = email;
             }
@@ -213,7 +230,9 @@ async function processCommit(octokit: OctokitClient, repoConfig: RepositoryConfi
             });
           } catch (e: any) {
             if (e.code === "P2002") {
-              console.warn(`Failed to create author (${githubHandle || email}) due to unique constraint, likely a race condition.`);
+              console.warn(
+                `Failed to create author (${githubHandle || email}) due to unique constraint, likely a race condition.`,
+              );
               if (githubHandle) {
                 dbAuthor = await tx.author.findUnique({
                   where: { githubHandle },
@@ -248,7 +267,10 @@ async function processCommit(octokit: OctokitClient, repoConfig: RepositoryConfi
         }
       });
     } catch (error) {
-      console.error(`Failed to process maintainer for commit ${commit.sha}:`, error);
+      console.error(
+        `Failed to process maintainer for commit ${commit.sha}:`,
+        error,
+      );
     }
   }
   for (const file of commit.files) {
@@ -256,20 +278,39 @@ async function processCommit(octokit: OctokitClient, repoConfig: RepositoryConfi
       continue;
     }
     const isProposalFile = file.filename.startsWith(repoConfig.eipsFolder);
-    const wasProposalFile = file.previous_filename?.startsWith(repoConfig.eipsFolder) ?? false;
+    const wasProposalFile =
+      file.previous_filename?.startsWith(repoConfig.eipsFolder) ?? false;
     if (!isProposalFile && !wasProposalFile) {
       continue;
     }
     switch (file.status) {
       case "added":
       case "modified":
-        await processProposalFile(octokit, repoConfig, file.filename, commit.sha, commit.commit.author?.date);
+        await processProposalFile(
+          octokit,
+          repoConfig,
+          file.filename,
+          commit.sha,
+          commit.commit.author?.date,
+        );
         break;
       case "renamed":
-        await handleRenamedFile(octokit, repoConfig, file.previous_filename!, file.filename, commit.sha, commit.commit.author?.date);
+        await handleRenamedFile(
+          octokit,
+          repoConfig,
+          file.previous_filename!,
+          file.filename,
+          commit.sha,
+          commit.commit.author?.date,
+        );
         break;
       case "removed":
-        await handleRemovedFile(repoConfig, file.filename, commit.sha, commit.commit.author?.date);
+        await handleRemovedFile(
+          repoConfig,
+          file.filename,
+          commit.sha,
+          commit.commit.author?.date,
+        );
         break;
       default:
         break;
@@ -277,18 +318,37 @@ async function processCommit(octokit: OctokitClient, repoConfig: RepositoryConfi
   }
 }
 
-async function handleRenamedFile(octokit: OctokitClient, repoConfig: RepositoryConfig, previousPath: string, newPath: string, commitSha: string, commitDateStr?: string) {
+async function handleRenamedFile(
+  octokit: OctokitClient,
+  repoConfig: RepositoryConfig,
+  previousPath: string,
+  newPath: string,
+  commitSha: string,
+  commitDateStr?: string,
+) {
   console.log(`[Renamed] File renamed from ${previousPath} to ${newPath}`);
-  const oldProposalNumberMatch = previousPath.match(/(?:[a-zA-Z]*-)?(\d+)\.md$/);
+  const oldProposalNumberMatch = previousPath.match(
+    /(?:[a-zA-Z]*-)?(\d+)\.md$/,
+  );
   if (!oldProposalNumberMatch) {
-    console.warn(`[Renamed] Could not extract proposal number from old path: ${previousPath}. Processing as new file.`);
-    await processProposalFile(octokit, repoConfig, newPath, commitSha, commitDateStr);
+    console.warn(
+      `[Renamed] Could not extract proposal number from old path: ${previousPath}. Processing as new file.`,
+    );
+    await processProposalFile(
+      octokit,
+      repoConfig,
+      newPath,
+      commitSha,
+      commitDateStr,
+    );
     return;
   }
   const oldProposalNumber = oldProposalNumberMatch[1];
   const newProposalNumberMatch = newPath.match(/(?:[a-zA-Z]*-)?(\d+)\.md$/);
   if (!newProposalNumberMatch) {
-    console.warn(`[Renamed] Could not extract proposal number from new path: ${newPath}. Aborting rename.`);
+    console.warn(
+      `[Renamed] Could not extract proposal number from new path: ${newPath}. Aborting rename.`,
+    );
     return;
   }
   const newProposalNumber = newProposalNumberMatch[1];
@@ -303,11 +363,21 @@ async function handleRenamedFile(octokit: OctokitClient, repoConfig: RepositoryC
     },
   });
   if (!proposal) {
-    console.warn(`[Renamed] Could not find original proposal number: ${oldProposalNumber}. Processing as new file.`);
-    await processProposalFile(octokit, repoConfig, newPath, commitSha, commitDateStr);
+    console.warn(
+      `[Renamed] Could not find original proposal number: ${oldProposalNumber}. Processing as new file.`,
+    );
+    await processProposalFile(
+      octokit,
+      repoConfig,
+      newPath,
+      commitSha,
+      commitDateStr,
+    );
     return;
   }
-  console.log(`[Renamed] Updating proposal ${proposal.id} path to ${newPath} and number to ${newProposalNumber}`);
+  console.log(
+    `[Renamed] Updating proposal ${proposal.id} path to ${newPath} and number to ${newProposalNumber}`,
+  );
   await prisma.proposal.update({
     where: { id: proposal.id },
     data: {
@@ -315,14 +385,27 @@ async function handleRenamedFile(octokit: OctokitClient, repoConfig: RepositoryC
       proposalNumber: newProposalNumber,
     },
   });
-  await processProposalFile(octokit, repoConfig, newPath, commitSha, commitDateStr);
+  await processProposalFile(
+    octokit,
+    repoConfig,
+    newPath,
+    commitSha,
+    commitDateStr,
+  );
 }
 
-async function handleRemovedFile(repoConfig: RepositoryConfig, filePath: string, commitSha: string, commitDateStr?: string) {
+async function handleRemovedFile(
+  repoConfig: RepositoryConfig,
+  filePath: string,
+  commitSha: string,
+  commitDateStr?: string,
+) {
   console.log(`[Removed] File removed: ${filePath}`);
   const proposalNumberMatch = filePath.match(/(?:[a-zA-Z]*-)?(\d+)\.md$/);
   if (!proposalNumberMatch) {
-    console.warn(`[Removed] Could not extract proposal number from path: ${filePath}`);
+    console.warn(
+      `[Removed] Could not extract proposal number from path: ${filePath}`,
+    );
     return;
   }
   const proposalNumber = proposalNumberMatch[1];
@@ -337,7 +420,9 @@ async function handleRemovedFile(repoConfig: RepositoryConfig, filePath: string,
     },
   });
   if (!proposal) {
-    console.warn(`[Removed] Could not find proposal for path: ${filePath}. It may have been removed in a previous step.`);
+    console.warn(
+      `[Removed] Could not find proposal for path: ${filePath}. It may have been removed in a previous step.`,
+    );
     return;
   }
   console.log(`[Removed] Marking proposal ${proposal.id} as 'Deleted'`);
@@ -364,7 +449,13 @@ async function handleRemovedFile(repoConfig: RepositoryConfig, filePath: string,
   });
 }
 
-export async function processProposalFile(octokit: OctokitClient, repoConfig: RepositoryConfig, filePath: string, commitSha: string, commitDateStr?: string) {
+export async function processProposalFile(
+  octokit: OctokitClient,
+  repoConfig: RepositoryConfig,
+  filePath: string,
+  commitSha: string,
+  commitDateStr?: string,
+) {
   console.log(`Processing file: ${filePath} at commit ${commitSha}`);
   try {
     const { data: contentResponse } = await octokit.rest.repos.getContent({
@@ -377,22 +468,32 @@ export async function processProposalFile(octokit: OctokitClient, repoConfig: Re
       console.warn(`No content found for ${filePath} at ${commitSha}`);
       return;
     }
-    const rawMarkdown = Buffer.from(contentResponse.content, "base64").toString("utf8");
+    const rawMarkdown = Buffer.from(contentResponse.content, "base64").toString(
+      "utf8",
+    );
     const { content: contentBody } = matter(rawMarkdown);
     const proposalNumberMatch = filePath.match(/(?:[a-zA-Z]*-)?(\d+)\.md$/);
     if (!proposalNumberMatch) return;
     const proposalNumber = proposalNumberMatch[1];
-    if (rawMarkdown.includes("This file was moved to") || rawMarkdown.includes("This EIP was moved to")) {
+    if (
+      rawMarkdown.includes("This file was moved to") ||
+      rawMarkdown.includes("This EIP was moved to")
+    ) {
       console.log(`[Moved] Detected moved notice for: ${filePath}`);
       const movePathMatch = rawMarkdown.match(/\[.*?\]\((.*?\/\S+\.md)\)/);
       const movedToPath = movePathMatch ? movePathMatch[1] : null;
       if (movedToPath) {
         console.log(`[Moved] Extracted destination path: ${movedToPath}`);
       } else {
-        console.warn(`[Moved] Could not extract destination path from move notice for: ${filePath}`);
+        console.warn(
+          `[Moved] Could not extract destination path from move notice for: ${filePath}`,
+        );
       }
       const commitDate = commitDateStr ? new Date(commitDateStr) : new Date();
-      const contentHash = crypto.createHash("sha256").update(contentBody).digest("hex");
+      const contentHash = crypto
+        .createHash("sha256")
+        .update(contentBody)
+        .digest("hex");
       await prisma.$transaction(async (tx) => {
         const proposal = await tx.proposal.findUnique({
           where: {
@@ -442,12 +543,26 @@ export async function processProposalFile(octokit: OctokitClient, repoConfig: Re
     const parser = getParser(repoConfig);
     const parsedData = parser.parse(rawMarkdown, `Proposal ${proposalNumber}`);
     if (!parsedData) {
-      console.warn(`[Parsing Failed] Could not parse metadata for: ${filePath}`);
+      console.warn(
+        `[Parsing Failed] Could not parse metadata for: ${filePath}`,
+      );
       return;
     }
-    const { title, status, type, category, created, discussionsTo, authors, requires } = parsedData;
+    const {
+      title,
+      status,
+      type,
+      category,
+      created,
+      discussionsTo,
+      authors,
+      requires,
+    } = parsedData;
     const commitDate = commitDateStr ? new Date(commitDateStr) : new Date();
-    const contentHash = crypto.createHash("sha256").update(contentBody).digest("hex");
+    const contentHash = crypto
+      .createHash("sha256")
+      .update(contentBody)
+      .digest("hex");
     await prisma.$transaction(
       async (tx) => {
         const proposal = await tx.proposal.upsert({
@@ -541,8 +656,10 @@ export async function processProposalFile(octokit: OctokitClient, repoConfig: Re
           if (dbAuthor) {
             const dataToUpdate: any = {};
             if (author.name && !dbAuthor.name) dataToUpdate.name = author.name;
-            if (author.email && !dbAuthor.email) dataToUpdate.email = author.email;
-            if (author.githubHandle && !dbAuthor.githubHandle) dataToUpdate.githubHandle = author.githubHandle;
+            if (author.email && !dbAuthor.email)
+              dataToUpdate.email = author.email;
+            if (author.githubHandle && !dbAuthor.githubHandle)
+              dataToUpdate.githubHandle = author.githubHandle;
             if (Object.keys(dataToUpdate).length > 0) {
               dbAuthor = await tx.author.update({
                 where: { id: dbAuthor.id },
@@ -575,10 +692,13 @@ export async function processProposalFile(octokit: OctokitClient, repoConfig: Re
           }
         }
       },
-      { timeout: 30000 }
+      { timeout: 30000 },
     );
   } catch (error) {
-    console.error(`Failed to process file ${filePath} at commit ${commitSha}:`, error);
+    console.error(
+      `Failed to process file ${filePath} at commit ${commitSha}:`,
+      error,
+    );
   }
 }
 
@@ -606,8 +726,13 @@ export interface ProtocolStatistics {
   lastUpdated: string;
 }
 
-export async function calculateAndCacheStatistics(protocol: string, snapshotDate: Date) {
-  console.log(`Processing statistics for protocol: ${protocol} at ${snapshotDate.toISOString()}`);
+export async function calculateAndCacheStatistics(
+  protocol: string,
+  snapshotDate: Date,
+) {
+  console.log(
+    `Processing statistics for protocol: ${protocol} at ${snapshotDate.toISOString()}`,
+  );
 
   const allProposals = await prisma.proposal.findMany({
     where: { repositoryProtocol: protocol },
@@ -632,11 +757,15 @@ export async function calculateAndCacheStatistics(protocol: string, snapshotDate
     const proposal = proposalMap.get(proposalId);
     if (!proposal) return [];
     let allVersions = [...proposal.versions];
-    const sourceProposals = allProposals.filter((p) => p.movedToId === proposalId);
+    const sourceProposals = allProposals.filter(
+      (p) => p.movedToId === proposalId,
+    );
     for (const source of sourceProposals) {
       allVersions.push(...getFullVersionHistory(source.id));
     }
-    const sorted = allVersions.sort((a, b) => b.commitDate.getTime() - a.commitDate.getTime());
+    const sorted = allVersions.sort(
+      (a, b) => b.commitDate.getTime() - a.commitDate.getTime(),
+    );
     unifiedHistories.set(proposalId, sorted);
     return sorted;
   }
@@ -708,7 +837,8 @@ export async function calculateAndCacheStatistics(protocol: string, snapshotDate
     }
     proposal.versions.forEach((version: any) => {
       version.authors.forEach((authorOnVersion: any) => {
-        const authorName = authorOnVersion.author.name || authorOnVersion.author.githubHandle;
+        const authorName =
+          authorOnVersion.author.name || authorOnVersion.author.githubHandle;
         if (authorName) {
           allAuthors.add(authorName);
           if (isEligible) {
@@ -737,8 +867,10 @@ export async function calculateAndCacheStatistics(protocol: string, snapshotDate
         };
       }
 
-      stats.statusCounts[proposal.status] = (stats.statusCounts[proposal.status] || 0) + 1;
-      stats.typeCounts[proposal.type] = (stats.typeCounts[proposal.type] || 0) + 1;
+      stats.statusCounts[proposal.status] =
+        (stats.statusCounts[proposal.status] || 0) + 1;
+      stats.typeCounts[proposal.type] =
+        (stats.typeCounts[proposal.type] || 0) + 1;
       if (proposal.created) {
         const year = new Date(proposal.created).getFullYear().toString();
         stats.yearCounts[year] = (stats.yearCounts[year] || 0) + 1;
@@ -752,7 +884,8 @@ export async function calculateAndCacheStatistics(protocol: string, snapshotDate
 
       const trackStats = stats.tracksBreakdown[track];
       trackStats.totalProposalsInTrack++;
-      trackStats.statusCountsInTrack[proposal.status] = (trackStats.statusCountsInTrack[proposal.status] || 0) + 1;
+      trackStats.statusCountsInTrack[proposal.status] =
+        (trackStats.statusCountsInTrack[proposal.status] || 0) + 1;
       if (finalizedStatuses.includes(proposal.status)) {
         trackStats.finalizedProposalsInTrack++;
       }
@@ -760,8 +893,10 @@ export async function calculateAndCacheStatistics(protocol: string, snapshotDate
   }
 
   for (const track in stats.tracksBreakdown) {
-    stats.tracksBreakdown[track].distinctAuthorsInTrackCount = authorsByTrack.get(track)?.size || 0;
-    stats.tracksBreakdown[track].authorsOnFinalizedInTrackCount = finalizedAuthorsByTrack.get(track)?.size || 0;
+    stats.tracksBreakdown[track].distinctAuthorsInTrackCount =
+      authorsByTrack.get(track)?.size || 0;
+    stats.tracksBreakdown[track].authorsOnFinalizedInTrackCount =
+      finalizedAuthorsByTrack.get(track)?.size || 0;
   }
 
   // --- Final Metric Calculations ---
@@ -771,16 +906,22 @@ export async function calculateAndCacheStatistics(protocol: string, snapshotDate
   stats.authorsOnFinalizedCount = finalizedAuthors.size;
 
   // 2. Proposal-centric metrics for Acceptance Rate
-  const finalizedProposalCount = (stats.statusCounts["Final"] || 0) + (stats.statusCounts["Living"] || 0);
+  const finalizedProposalCount =
+    (stats.statusCounts["Final"] || 0) + (stats.statusCounts["Living"] || 0);
   const withdrawnProposalCount = stats.statusCounts["Withdrawn"] || 0;
   const stagnantProposalCount = stats.statusCounts["Stagnant"] || 0;
 
-  const eligibleProposalCount = stats.totalProposals - withdrawnProposalCount - stagnantProposalCount;
+  const eligibleProposalCount =
+    stats.totalProposals - withdrawnProposalCount - stagnantProposalCount;
 
-  stats.acceptanceScore = eligibleProposalCount > 0 ? finalizedProposalCount / eligibleProposalCount : 0;
+  stats.acceptanceScore =
+    eligibleProposalCount > 0
+      ? finalizedProposalCount / eligibleProposalCount
+      : 0;
 
   // 3. General stats
-  stats.averageWordCount = stats.totalProposals > 0 ? stats.totalWordCount / stats.totalProposals : 0;
+  stats.averageWordCount =
+    stats.totalProposals > 0 ? stats.totalWordCount / stats.totalProposals : 0;
 
   const year = snapshotDate.getUTCFullYear();
   const month = snapshotDate.getUTCMonth() + 1;
@@ -834,7 +975,9 @@ export async function calculateAndCacheStatistics(protocol: string, snapshotDate
       create: trackData,
     });
   }
-  console.log(`Successfully processed and stored statistics snapshot for protocol: ${protocol}`);
+  console.log(
+    `Successfully processed and stored statistics snapshot for protocol: ${protocol}`,
+  );
 }
 
 export async function resolveMovedProposals() {
@@ -862,27 +1005,42 @@ export async function resolveMovedProposals() {
   console.log(`Found ${proposalsToResolve.length} proposals to resolve.`);
   let resolvedCount = 0;
   for (const sourceProposal of proposalsToResolve) {
-    console.log(`\n-> Resolving move for proposal #${sourceProposal.proposalNumber} from ${sourceProposal.repositoryRepo}...`);
-    console.log(`   Destination path from notice: ${sourceProposal.movedToPath!}`);
+    console.log(
+      `\n-> Resolving move for proposal #${sourceProposal.proposalNumber} from ${sourceProposal.repositoryRepo}...`,
+    );
+    console.log(
+      `   Destination path from notice: ${sourceProposal.movedToPath!}`,
+    );
     const destinationPath = sourceProposal.movedToPath!;
-    const destDir = path.dirname(destinationPath).split(path.sep).pop();
+    const destDir = path.dirname(destinationPath);
     const destFilename = path.basename(destinationPath);
-    if (!destDir) {
-      console.warn(`   [WARN] Could not determine destination folder. Skipping.`);
-      continue;
-    }
+
+    // Find the repo config that matches the destination folder. This is more
+    // robust than splitting/popping the path, and correctly handles files
+    // moved to the root directory (where dirname is '.').
     const destRepoConfig = repoMapByFolder.get(destDir);
+
     if (!destRepoConfig) {
-      console.warn(`   [WARN] No repository configuration found for folder "${destDir}". Skipping.`);
+      console.warn(
+        `   [WARN] No repository configuration found for folder "${destDir}". Skipping.`,
+      );
       continue;
     }
-    const destProposalNumberMatch = destFilename.match(/(?:[a-zA-Z]*-)?(\d+)\.md$/);
+
+    // More reliable regex: case-insensitive, requires letters in prefix if it exists.
+    const destProposalNumberMatch = destFilename.match(
+      /(?:[a-zA-Z]+-)?(\d+)\.md$/i,
+    );
     if (!destProposalNumberMatch) {
-      console.warn(`   [WARN] Could not parse proposal number from "${destFilename}". Skipping.`);
+      console.warn(
+        `   [WARN] Could not parse proposal number from "${destFilename}". Skipping.`,
+      );
       continue;
     }
     const destProposalNumber = destProposalNumberMatch[1];
-    console.log(`   Attempting to find destination: Repo=${destRepoConfig.repo}, Number=${destProposalNumber}`);
+    console.log(
+      `   Attempting to find destination: Repo=${destRepoConfig.repo}, Number=${destProposalNumber}`,
+    );
     const destinationProposal = await prisma.proposal.findUnique({
       where: {
         repositoryOwner_repositoryRepo_repositoryProtocol_proposalNumber: {
@@ -900,13 +1058,19 @@ export async function resolveMovedProposals() {
           movedToId: destinationProposal.id,
         },
       });
-      console.log(`   [SUCCESS] Successfully linked to proposal ID: ${destinationProposal.id}`);
+      console.log(
+        `   [SUCCESS] Successfully linked to proposal ID: ${destinationProposal.id}`,
+      );
       resolvedCount++;
     } else {
-      console.warn(`   [WARN] Destination proposal not found in database. It may not have been processed yet. Skipping for now.`);
+      console.warn(
+        `   [WARN] Destination proposal not found in database. It may not have been processed yet. Skipping for now.`,
+      );
     }
   }
-  console.log(`\nMove resolution process complete. Successfully resolved ${resolvedCount} of ${proposalsToResolve.length} proposals.`);
+  console.log(
+    `\nMove resolution process complete. Successfully resolved ${resolvedCount} of ${proposalsToResolve.length} proposals.`,
+  );
 }
 
 const CONCURRENCY_LIMIT = 4;
@@ -919,12 +1083,22 @@ export async function regenerateAllHistoricalSnapshots() {
     },
   });
   if (!firstVersion) {
-    console.log("No proposal versions found in the database. Cannot regenerate snapshots.");
+    console.log(
+      "No proposal versions found in the database. Cannot regenerate snapshots.",
+    );
     return;
   }
-  const startDate = new Date(Date.UTC(firstVersion.commitDate.getUTCFullYear(), firstVersion.commitDate.getUTCMonth(), 1));
+  const startDate = new Date(
+    Date.UTC(
+      firstVersion.commitDate.getUTCFullYear(),
+      firstVersion.commitDate.getUTCMonth(),
+      1,
+    ),
+  );
   const endDate = new Date();
-  console.log(`Found data ranging from ${startDate.toISOString()} to ${endDate.toISOString()}`);
+  console.log(
+    `Found data ranging from ${startDate.toISOString()} to ${endDate.toISOString()}`,
+  );
   const enabledRepositories = await prisma.repository.findMany({
     where: { enabled: true },
     select: { protocol: true },
@@ -940,8 +1114,12 @@ export async function regenerateAllHistoricalSnapshots() {
     const snapshotDateForMonth = new Date(Date.UTC(year, month, 0));
     for (let i = 0; i < protocols.length; i += CONCURRENCY_LIMIT) {
       const batch = protocols.slice(i, i + CONCURRENCY_LIMIT);
-      console.log(`   -> Processing batch of ${batch.length} protocols: [${batch.join(", ")}]`);
-      const batchPromises = batch.map((protocol) => calculateAndCacheStatistics(protocol, snapshotDateForMonth));
+      console.log(
+        `   -> Processing batch of ${batch.length} protocols: [${batch.join(", ")}]`,
+      );
+      const batchPromises = batch.map((protocol) =>
+        calculateAndCacheStatistics(protocol, snapshotDateForMonth),
+      );
       await Promise.all(batchPromises);
     }
     // After processing all protocols for the month, create the global aggregate.
@@ -961,7 +1139,9 @@ async function aggregateAndStoreForMonth(dateForMonth: Date) {
   });
 
   if (monthlySnapshots.length === 0) {
-    console.log(`   No protocol snapshots found for ${year}-${month} to aggregate.`);
+    console.log(
+      `   No protocol snapshots found for ${year}-${month} to aggregate.`,
+    );
     return;
   }
 
@@ -992,11 +1172,18 @@ async function aggregateAndStoreForMonth(dateForMonth: Date) {
   // --- Calculate Definitive Metrics ---
 
   // 1. Proposal-centric Acceptance Rate
-  const eligibleProposals = proposalCounts.total - proposalCounts.withdrawn - proposalCounts.stagnant;
-  const acceptanceRate = eligibleProposals > 0 ? (proposalCounts.finalized / eligibleProposals) * 100 : 0;
+  const eligibleProposals =
+    proposalCounts.total - proposalCounts.withdrawn - proposalCounts.stagnant;
+  const acceptanceRate =
+    eligibleProposals > 0
+      ? (proposalCounts.finalized / eligibleProposals) * 100
+      : 0;
 
   // 2. Author-centric Centralization Score
-  const centralizationRate = authorCounts.distinct > 0 ? (1 - authorCounts.onFinalized / authorCounts.distinct) * 100 : 0;
+  const centralizationRate =
+    authorCounts.distinct > 0
+      ? (1 - authorCounts.onFinalized / authorCounts.distinct) * 100
+      : 0;
 
   // --- Save to Database ---
   const snapshotDate = new Date(Date.UTC(year, month - 1, 1));
@@ -1017,7 +1204,9 @@ async function aggregateAndStoreForMonth(dateForMonth: Date) {
     create: globalSnapshotData,
   });
 
-  console.log(`   Successfully stored global statistics snapshot for ${year}-${month}.`);
+  console.log(
+    `   Successfully stored global statistics snapshot for ${year}-${month}.`,
+  );
 }
 
 export async function backfillGlobalStats() {
@@ -1029,12 +1218,28 @@ export async function backfillGlobalStats() {
     orderBy: { snapshotDate: "desc" },
   });
   if (!firstSnapshot || !lastSnapshot) {
-    console.log("No protocol snapshots found in the database. Exiting backfill script.");
+    console.log(
+      "No protocol snapshots found in the database. Exiting backfill script.",
+    );
     return;
   }
-  console.log(`Found data ranging from ${firstSnapshot.snapshotDate.toISOString()} to ${lastSnapshot.snapshotDate.toISOString()}`);
-  let currentDate = new Date(Date.UTC(firstSnapshot.snapshotDate.getUTCFullYear(), firstSnapshot.snapshotDate.getUTCMonth(), 1));
-  const lastDate = new Date(Date.UTC(lastSnapshot.snapshotDate.getUTCFullYear(), lastSnapshot.snapshotDate.getUTCMonth(), 1));
+  console.log(
+    `Found data ranging from ${firstSnapshot.snapshotDate.toISOString()} to ${lastSnapshot.snapshotDate.toISOString()}`,
+  );
+  let currentDate = new Date(
+    Date.UTC(
+      firstSnapshot.snapshotDate.getUTCFullYear(),
+      firstSnapshot.snapshotDate.getUTCMonth(),
+      1,
+    ),
+  );
+  const lastDate = new Date(
+    Date.UTC(
+      lastSnapshot.snapshotDate.getUTCFullYear(),
+      lastSnapshot.snapshotDate.getUTCMonth(),
+      1,
+    ),
+  );
   while (currentDate <= lastDate) {
     await aggregateAndStoreForMonth(currentDate);
     currentDate.setUTCMonth(currentDate.getUTCMonth() + 1);
@@ -1055,11 +1260,17 @@ export async function updateLatestSnapshots() {
   const snapshotDate = new Date(now.getUTCFullYear(), now.getUTCMonth(), 0);
   const year = snapshotDate.getUTCFullYear();
   const month = snapshotDate.getUTCMonth() + 1;
-  console.log(`Updating snapshots for all protocols for the period ending ${snapshotDate.toISOString()} (${year}-${month})`);
+  console.log(
+    `Updating snapshots for all protocols for the period ending ${snapshotDate.toISOString()} (${year}-${month})`,
+  );
   for (let i = 0; i < protocols.length; i += CONCURRENCY_LIMIT) {
     const batch = protocols.slice(i, i + CONCURRENCY_LIMIT);
-    console.log(`   -> Processing batch of ${batch.length} protocols: [${batch.join(", ")}]`);
-    const batchPromises = batch.map((protocol) => calculateAndCacheStatistics(protocol, snapshotDate));
+    console.log(
+      `   -> Processing batch of ${batch.length} protocols: [${batch.join(", ")}]`,
+    );
+    const batchPromises = batch.map((protocol) =>
+      calculateAndCacheStatistics(protocol, snapshotDate),
+    );
     await Promise.all(batchPromises);
   }
   console.log(`\nAggregating global snapshot for ${year}-${month}...`);

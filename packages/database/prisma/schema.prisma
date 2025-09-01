@@ -24,6 +24,7 @@ model Repository {
   enabled        Boolean @default(true)
   description    String?
   website        String?
+  forkedFrom     Json?
 
   // Tracks the last commit processed to prevent re-crawling the same history.
   lastCrawledCommitSha String?

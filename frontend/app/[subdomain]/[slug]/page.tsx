@@ -27,6 +27,7 @@ import {
   IconClock,
   IconInfoCircle,
   IconChartLine,
+  IconGitMerge,
 } from "@tabler/icons-react";
 import { useRouter, useParams } from "next/navigation";
 import {
@@ -58,8 +59,6 @@ interface UnifiedProposal {
   enrichedRequires: { number: string; status: string }[];
   isMoved: boolean;
   originalPath?: string;
-  repositoryOwner: string;
-  repositoryRepo: string;
   versions: {
     id: string;
     commitSha: string;
@@ -67,6 +66,9 @@ interface UnifiedProposal {
     rawMarkdown: string;
     status: string;
     authors: { author: { name: string | null; githubHandle: string | null } }[];
+    repositoryOwner: string;
+    repositoryRepo: string;
+    proposalSlug: string;
   }[];
 }
 
@@ -170,6 +172,17 @@ function AnalyticsView({ proposal }: { proposal: UnifiedProposal }) {
 
   return (
     <Stack gap="xl">
+      {proposal.isMoved && (
+        <Alert
+          variant="light"
+          color="blue"
+          title="Combined History"
+          icon={<IconInfoCircle />}
+        >
+          The analytics below are based on the proposal's complete, combined
+          history across all repositories where it has existed.
+        </Alert>
+      )}
       <SimpleGrid cols={{ base: 1, sm: 3 }}>
         <Paper p="xl" radius="md" ta="center">
           <Text size="2rem" fw={700}>
@@ -463,40 +476,67 @@ export default function SubdomainSlugDetailPage() {
                   bulletSize={18}
                   lineWidth={2}
                 >
-                  {proposal.versions.map((version) => (
-                    <Timeline.Item
-                      key={version.id}
-                      title={
-                        <Group justify="space-between">
-                          <Text fw={500} size="md">
-                            Status: {version.status}
-                          </Text>
-                          <Anchor
-                            href={`https://github.com/${proposal.repositoryOwner}/${proposal.repositoryRepo}/commit/${version.commitSha}`}
-                            target="_blank"
-                            size="sm"
+                  {proposal.versions.map((version, index) => {
+                    const prevVersion =
+                      index < proposal.versions.length - 1
+                        ? proposal.versions[index + 1]
+                        : null;
+                    const repoChanged =
+                      prevVersion &&
+                      (version.repositoryRepo !== prevVersion.repositoryRepo ||
+                        version.repositoryOwner !==
+                          prevVersion.repositoryOwner);
+
+                    return (
+                      <>
+                        {repoChanged && (
+                          <Timeline.Item
+                            bullet={<IconGitMerge size={12} />}
+                            title={`Moved to ${version.repositoryOwner}/${version.repositoryRepo}`}
                           >
-                            <Group gap="xs" align="center">
-                              <Text style={{ fontFamily: "monospace" }}>
-                                {version.commitSha.substring(0, 7)}
+                            <Text c="dimmed" size="xs">
+                              Proposal is now tracked as{" "}
+                              {version.proposalSlug.toUpperCase()}
+                            </Text>
+                          </Timeline.Item>
+                        )}
+                        <Timeline.Item
+                          key={version.id}
+                          title={
+                            <Group justify="space-between">
+                              <Text fw={500} size="md">
+                                Status: {version.status}
                               </Text>
-                              <IconExternalLink size="0.9rem" />
+                              <Anchor
+                                href={`https://github.com/${version.repositoryOwner}/${version.repositoryRepo}/commit/${version.commitSha}`}
+                                target="_blank"
+                                size="sm"
+                              >
+                                <Group gap="xs" align="center">
+                                  <Text style={{ fontFamily: "monospace" }}>
+                                    {version.commitSha.substring(0, 7)}
+                                  </Text>
+                                  <IconExternalLink size="0.9rem" />
+                                </Group>
+                              </Anchor>
                             </Group>
-                          </Anchor>
-                        </Group>
-                      }
-                    >
-                      <Text c="dimmed" size="sm">
-                        Authored by{" "}
-                        {version.authors
-                          .map((a) => a.author.name || a.author.githubHandle)
-                          .join(", ") || "N/A"}
-                      </Text>
-                      <Text size="xs" mt={4}>
-                        {formatDate(version.commitDate)}
-                      </Text>
-                    </Timeline.Item>
-                  ))}
+                          }
+                        >
+                          <Text c="dimmed" size="sm">
+                            Authored by{" "}
+                            {version.authors
+                              .map(
+                                (a) => a.author.name || a.author.githubHandle,
+                              )
+                              .join(", ") || "N/A"}
+                          </Text>
+                          <Text size="xs" mt={4}>
+                            {formatDate(version.commitDate)}
+                          </Text>
+                        </Timeline.Item>
+                      </>
+                    );
+                  })}
                 </Timeline>
               </Stack>
             </Paper>

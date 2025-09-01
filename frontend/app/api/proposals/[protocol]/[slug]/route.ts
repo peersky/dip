@@ -9,6 +9,9 @@ import type {
 // Define an extended type for our versions to include authors
 type VersionWithAuthors = ProposalVersion & {
   authors: { author: Author }[];
+  repositoryOwner: string;
+  repositoryRepo: string;
+  slug: string;
 };
 
 // Define the final shape of the proposal data we'll return
@@ -42,6 +45,7 @@ async function getUnifiedProposalHistory(
     const nextProposal = await prisma.proposal.findUnique({
       where: { id: finalProposal.movedToId },
       include: {
+        repository: true,
         versions: {
           orderBy: { commitDate: "desc" },
           include: { authors: { include: { author: true } } },
@@ -64,12 +68,22 @@ async function getUnifiedProposalHistory(
     if (!current || processedIds.has(current.id)) continue;
 
     processedIds.add(current.id);
-    allVersions.push(...current.versions);
+
+    // Enrich versions with their specific repository context before adding them.
+    const enrichedVersions = current.versions.map((version) => ({
+      ...version,
+      repositoryOwner: current.repositoryOwner,
+      repositoryRepo: current.repositoryRepo,
+      slug: `${(current as any).repository.proposalPrefix}-${current.proposalNumber}`,
+    }));
+
+    allVersions.push(...enrichedVersions);
 
     // Find all proposals that were moved *to* the current one.
     const sourceProposals = await prisma.proposal.findMany({
       where: { movedToId: current.id },
       include: {
+        repository: true,
         versions: {
           orderBy: { commitDate: "desc" },
           include: { authors: { include: { author: true } } },
@@ -144,6 +158,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
         },
       },
       include: {
+        repository: true,
         versions: {
           orderBy: { commitDate: "desc" },
           include: { authors: { include: { author: true } } },

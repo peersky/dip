@@ -153,7 +153,7 @@ function SankeyView({ protocol }: { protocol: string }) {
         How proposals transition between different statuses over their
         lifecycle.
       </Text>
-      <Box style={{ height: 500 }}>
+      <Box style={{ height: 500, backgroundColor: "white" }}>
         <ResponsiveSankey
           data={sankeyData}
           margin={{ top: 40, right: 160, bottom: 40, left: 50 }}
@@ -182,11 +182,7 @@ function SankeyView({ protocol }: { protocol: string }) {
             modifiers: [["darker", 1]],
           }}
           // Add a custom layer to render the link values.
-          layers={[
-            "links",
-            "nodes",
-            "labels",
-          ]}
+          layers={["links", "nodes", "labels"]}
           theme={{
             labels: {
               text: {
@@ -210,24 +206,48 @@ function SankeyView({ protocol }: { protocol: string }) {
 // --- Statistics Tab Component ---
 function StatisticsView({ protocol }: { protocol: string }) {
   const [stats, setStats] = useState<ProtocolStats | null>(null);
+  const [analytics, setAnalytics] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const theme = useMantineTheme();
 
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchData = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(`/api/stats/${protocol}`);
-        if (!response.ok) {
-          throw new Error(`Failed to fetch statistics: ${response.statusText}`);
+        const [statsResponse, analyticsResponse] = await Promise.all([
+          fetch(`/api/stats/${protocol}`),
+          fetch(`/api/analytics/${protocol}`),
+        ]);
+
+        if (!statsResponse.ok) {
+          throw new Error(
+            `Failed to fetch statistics: ${statsResponse.statusText}`,
+          );
         }
-        const data = await response.json();
-        if (data.success) {
-          setStats(data.statistics);
+        const statsData = await statsResponse.json();
+        if (statsData.success) {
+          setStats(statsData.statistics);
         } else {
-          throw new Error(data.error || "An unknown error occurred");
+          throw new Error(
+            statsData.error || "An unknown error occurred fetching stats",
+          );
+        }
+
+        if (!analyticsResponse.ok) {
+          throw new Error(
+            `Failed to fetch analytics: ${analyticsResponse.statusText}`,
+          );
+        }
+        const analyticsData = await analyticsResponse.json();
+        if (analyticsData.success) {
+          setAnalytics(analyticsData.data);
+        } else {
+          throw new Error(
+            analyticsData.error ||
+              "An unknown error occurred fetching analytics",
+          );
         }
       } catch (err: any) {
         setError(err.message);
@@ -236,7 +256,7 @@ function StatisticsView({ protocol }: { protocol: string }) {
       }
     };
 
-    fetchStats();
+    fetchData();
   }, [protocol]);
 
   if (isLoading) {
@@ -261,7 +281,7 @@ function StatisticsView({ protocol }: { protocol: string }) {
     return <Text c="red">Could not load statistics: {error}</Text>;
   }
 
-  if (!stats) {
+  if (!stats || !analytics || analytics.length === 0) {
     return <Text>No statistics available for this protocol.</Text>;
   }
 
@@ -291,12 +311,9 @@ function StatisticsView({ protocol }: { protocol: string }) {
     );
   };
 
-  const acceptanceRate =
-    stats.distinctAuthorsCount > 0
-      ? stats.authorsOnFinalizedCount / stats.distinctAuthorsCount
-      : 0;
-
-  const centralizationRate = 1 - acceptanceRate;
+  const latestAnalytics = analytics[analytics.length - 1];
+  const acceptanceRate = latestAnalytics.acceptanceRate;
+  const centralizationRate = latestAnalytics.centralizationRate;
 
   const statusChartData = Object.entries(stats.statusCounts)
     .filter(([name]) => name !== "Moved")
@@ -335,10 +352,10 @@ function StatisticsView({ protocol }: { protocol: string }) {
               size={80}
               thickness={8}
               roundCaps
-              sections={[{ value: acceptanceRate * 100, color: "teal" }]}
+              sections={[{ value: acceptanceRate, color: "teal" }]}
               label={
                 <Text c="teal" fw={700} ta="center" size="lg">
-                  {(acceptanceRate * 100).toFixed(0)}%
+                  {acceptanceRate.toFixed(0)}%
                 </Text>
               }
             />
@@ -353,10 +370,10 @@ function StatisticsView({ protocol }: { protocol: string }) {
               size={80}
               thickness={8}
               roundCaps
-              sections={[{ value: centralizationRate * 100, color: "orange" }]}
+              sections={[{ value: centralizationRate, color: "orange" }]}
               label={
                 <Text c="orange" fw={700} ta="center" size="lg">
-                  {(centralizationRate * 100).toFixed(0)}%
+                  {centralizationRate.toFixed(0)}%
                 </Text>
               }
             />
