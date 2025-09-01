@@ -1,53 +1,85 @@
 "use client";
 
-import { TextInput, Textarea, Button, Stack, Select, Group, Fieldset, Paper, MultiSelect, Text, InputWrapper, Input, Tabs, Alert, LoadingOverlay } from "@mantine/core";
+import {
+  TextInput,
+  Textarea,
+  Button,
+  Stack,
+  Select,
+  Group,
+  Fieldset,
+  Paper,
+  MultiSelect,
+  Text,
+  InputWrapper,
+  Input,
+  Tabs,
+  Alert,
+  LoadingOverlay,
+} from "@mantine/core";
 import { useForm, UseFormReturnType } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
-import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
-import dynamic from 'next/dynamic';
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+  useCallback,
+} from "react";
+import dynamic from "next/dynamic";
 import { formatEipForSubmit, generateEipFilename } from "@/lib/eip-utils";
-import ReactMarkdown from 'react-markdown';
-import type { MDXEditorMethods } from '@mdxeditor/editor';
-import { GitHubAuth } from '@/components/GitHubAuth';
-import { LoadingSpinner } from '@/components/shared/LoadingSpinner';
-import { ErrorDisplay } from '@/components/shared/ErrorDisplay';
+import ReactMarkdown from "react-markdown";
+import type { MDXEditorMethods } from "@mdxeditor/editor";
+import { GitHubAuth } from "@/components/GitHubAuth";
+import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import { ErrorDisplay } from "@/components/shared/ErrorDisplay";
 import { IconCheck, IconX, IconGitPullRequest } from "@tabler/icons-react";
 
 // Dynamically import MarkdownEditor with SSR turned off
-const MarkdownEditor = dynamic(() => import("@/components/shared/MarkdownEditor"), {
-  ssr: false,
-  loading: () => <LoadingSpinner size="sm" message="Loading editor..." />,
-});
+const MarkdownEditor = dynamic(
+  () => import("@/components/shared/MarkdownEditor"),
+  {
+    ssr: false,
+    loading: () => <LoadingSpinner size="sm" message="Loading editor..." />,
+  },
+);
 
 // Helper functions (can be moved to eip-utils.ts later)
-const parseEipSectionsFromMarkdown = (markdownContent: string): Partial<EipFormSubmitData> => {
+const parseEipSectionsFromMarkdown = (
+  markdownContent: string,
+): Partial<EipFormSubmitData> => {
   const sections: Partial<EipFormSubmitData> & { copyright?: string } = {};
-  const lines = markdownContent.split('\n');
-  let currentSectionKey: keyof (EipFormSubmitData & { copyright?: string }) | null = null;
+  const lines = markdownContent.split("\n");
+  let currentSectionKey:
+    | keyof (EipFormSubmitData & { copyright?: string })
+    | null = null;
   let currentContent: string[] = [];
 
-  const sectionMappings: Record<string, keyof (EipFormSubmitData & { copyright?: string })> = {
-    'abstract': 'abstract',
-    'motivation': 'motivation',
-    'specification': 'specification',
-    'rationale': 'rationale',
-    'backwards compatibility': 'backwardsCompatibility',
-    'test cases': 'testCases',
-    'reference implementation': 'referenceImplementation',
-    'security considerations': 'securityConsiderations',
-    'copyright': 'copyright',
+  const sectionMappings: Record<
+    string,
+    keyof (EipFormSubmitData & { copyright?: string })
+  > = {
+    abstract: "abstract",
+    motivation: "motivation",
+    specification: "specification",
+    rationale: "rationale",
+    "backwards compatibility": "backwardsCompatibility",
+    "test cases": "testCases",
+    "reference implementation": "referenceImplementation",
+    "security considerations": "securityConsiderations",
+    copyright: "copyright",
   };
 
   function saveCurrentSection() {
     if (currentSectionKey && currentContent.length > 0) {
-      sections[currentSectionKey] = currentContent.join('\n').trim();
+      sections[currentSectionKey] = currentContent.join("\n").trim();
     }
   }
 
   for (const line of lines) {
-    if (line.startsWith('## ')) {
+    if (line.startsWith("## ")) {
       saveCurrentSection();
-      const headerText = line.replace('## ', '').trim().toLowerCase();
+      const headerText = line.replace("## ", "").trim().toLowerCase();
       currentSectionKey = sectionMappings[headerText] || null;
       currentContent = [];
     } else if (currentSectionKey) {
@@ -59,49 +91,91 @@ const parseEipSectionsFromMarkdown = (markdownContent: string): Partial<EipFormS
 };
 
 const combineEipSectionsToMarkdown = (
-  sectionData: Partial<Pick<EipFormInitialData, 'abstract' | 'motivation' | 'specification' | 'rationale' | 'backwardsCompatibility' | 'testCases' | 'referenceImplementation' | 'securityConsiderations' | 'copyright'> >,
-  defaultContentTemplate: string
+  sectionData: Partial<
+    Pick<
+      EipFormInitialData,
+      | "abstract"
+      | "motivation"
+      | "specification"
+      | "rationale"
+      | "backwardsCompatibility"
+      | "testCases"
+      | "referenceImplementation"
+      | "securityConsiderations"
+      | "copyright"
+    >
+  >,
+  defaultContentTemplate: string,
 ): string => {
-  const orderedSections: Array<{ key: keyof typeof sectionData, header: string, isOptional?: boolean }> = [
-    { key: 'abstract', header: '## Abstract' },
-    { key: 'motivation', header: '## Motivation', isOptional: true },
-    { key: 'specification', header: '## Specification' },
-    { key: 'rationale', header: '## Rationale', isOptional: true },
-    { key: 'backwardsCompatibility', header: '## Backwards Compatibility', isOptional: true },
-    { key: 'testCases', header: '## Test Cases', isOptional: true },
-    { key: 'referenceImplementation', header: '## Reference Implementation', isOptional: true },
-    { key: 'securityConsiderations', header: '## Security Considerations' },
-    { key: 'copyright', header: '## Copyright' },
+  const orderedSections: Array<{
+    key: keyof typeof sectionData;
+    header: string;
+    isOptional?: boolean;
+  }> = [
+    { key: "abstract", header: "## Abstract" },
+    { key: "motivation", header: "## Motivation", isOptional: true },
+    { key: "specification", header: "## Specification" },
+    { key: "rationale", header: "## Rationale", isOptional: true },
+    {
+      key: "backwardsCompatibility",
+      header: "## Backwards Compatibility",
+      isOptional: true,
+    },
+    { key: "testCases", header: "## Test Cases", isOptional: true },
+    {
+      key: "referenceImplementation",
+      header: "## Reference Implementation",
+      isOptional: true,
+    },
+    { key: "securityConsiderations", header: "## Security Considerations" },
+    { key: "copyright", header: "## Copyright" },
   ];
 
   let content = orderedSections
-    .map(section => {
+    .map((section) => {
       const sectionText = sectionData[section.key];
-      if (sectionText && sectionText.trim() !== '' && !sectionText.trim().startsWith('[')) {
+      if (
+        sectionText &&
+        sectionText.trim() !== "" &&
+        !sectionText.trim().startsWith("[")
+      ) {
         return `${section.header}\n\n${sectionText.trim()}`;
       }
       return null;
     })
     .filter(Boolean)
-    .join('\n\n');
+    .join("\n\n");
 
   let finalMarkdown = defaultContentTemplate;
-  orderedSections.forEach(section => {
+  orderedSections.forEach((section) => {
     const sectionText = sectionData[section.key];
-    if (sectionText && sectionText.trim() !== '' && !sectionText.trim().startsWith('[')){
-        const regex = new RegExp(`(${section.header}[\s\S]*?)(?:\n## |$)`, 'i');
-        const placeholderRegex = new RegExp(`(${section.header}\n\n\[[\s\S]*?\])(?:\n## |$)`, 'i');
-        if (finalMarkdown.match(placeholderRegex)) {
-             finalMarkdown = finalMarkdown.replace(placeholderRegex, `${section.header}\n\n${sectionText.trim()}\n
-`);
-        } else if (finalMarkdown.match(regex)) {
-            finalMarkdown = finalMarkdown.replace(regex, `${section.header}\n\n${sectionText.trim()}\n
-`);
-        }
+    if (
+      sectionText &&
+      sectionText.trim() !== "" &&
+      !sectionText.trim().startsWith("[")
+    ) {
+      const regex = new RegExp(`(${section.header}[\s\S]*?)(?:\n## |$)`, "i");
+      const placeholderRegex = new RegExp(
+        `(${section.header}\n\n\[[\s\S]*?\])(?:\n## |$)`,
+        "i",
+      );
+      if (finalMarkdown.match(placeholderRegex)) {
+        finalMarkdown = finalMarkdown.replace(
+          placeholderRegex,
+          `${section.header}\n\n${sectionText.trim()}\n
+`,
+        );
+      } else if (finalMarkdown.match(regex)) {
+        finalMarkdown = finalMarkdown.replace(
+          regex,
+          `${section.header}\n\n${sectionText.trim()}\n
+`,
+        );
+      }
     }
   });
 
-  return finalMarkdown.replace(/\n\n\n/g, '\n\n');
+  return finalMarkdown.replace(/\n\n\n/g, "\n\n");
 };
 
 interface EipFormValues {
@@ -143,7 +217,8 @@ interface EipFormInitialData {
   mainContent?: string;
 }
 
-export interface EipFormSubmitData extends Omit<EipFormValues, 'mainContent' | 'requires'> {
+export interface EipFormSubmitData
+  extends Omit<EipFormValues, "mainContent" | "requires"> {
   requires?: string;
   abstract: string;
   motivation?: string;
@@ -211,13 +286,21 @@ const initialEipFormValues: EipFormValues = {
   status: "Draft",
   type: "Standards Track",
   category: "Core",
-  created: new Date().toISOString().split('T')[0],
+  created: new Date().toISOString().split("T")[0],
   requires: [],
   withdrawalReason: "",
   mainContent: defaultMainContent,
 };
 
-const eipStatuses = ["Draft", "Review", "Last Call", "Final", "Stagnant", "Withdrawn", "Living"];
+const eipStatuses = [
+  "Draft",
+  "Review",
+  "Last Call",
+  "Final",
+  "Stagnant",
+  "Withdrawn",
+  "Living",
+];
 const eipTypes = ["Standards Track", "Meta", "Informational"];
 const eipCategories = ["Core", "Networking", "Interface", "ERC"];
 
@@ -231,7 +314,11 @@ const mockEipReferences = [
 ];
 
 interface EipFormProps {
-  onSubmit: (data: { rawSubmitData: EipFormSubmitData, fullMarkdown: string, filename: string }) => Promise<void>;
+  onSubmit: (data: {
+    rawSubmitData: EipFormSubmitData;
+    fullMarkdown: string;
+    filename: string;
+  }) => Promise<void>;
   initialData?: EipFormInitialData;
   isEditing?: boolean;
   eipNumber?: string;
@@ -241,7 +328,7 @@ const requiredSectionsHeaders = [
   "## Abstract",
   "## Specification",
   "## Security Considerations",
-  "## Copyright"
+  "## Copyright",
 ];
 
 const mockEipData = {
@@ -252,7 +339,7 @@ const mockEipData = {
   status: "Draft",
   type: "Standards Track",
   category: "Core",
-  created: new Date().toISOString().split('T')[0],
+  created: new Date().toISOString().split("T")[0],
   requires: [],
   mainContent: `## Abstract
 
@@ -293,14 +380,21 @@ This test EIP poses no security risks as it is for testing purposes only. In a r
 
 ## Copyright
 
-Copyright and related rights waived via CC0.`
+Copyright and related rights waived via CC0.`,
 };
 
-export default function EipForm({ onSubmit, initialData, isEditing = false, eipNumber }: EipFormProps) {
+export default function EipForm({
+  onSubmit,
+  initialData,
+  isEditing = false,
+  eipNumber,
+}: EipFormProps) {
   const editorRef = useRef<MDXEditorMethods>(null);
-  const [previewMarkdown, setPreviewMarkdown] = useState('');
-  const [activeTab, setActiveTab] = useState<string | null>('edit');
-  const [githubInstallationId, setGithubInstallationId] = useState<string | null>(null);
+  const [previewMarkdown, setPreviewMarkdown] = useState("");
+  const [activeTab, setActiveTab] = useState<string | null>("edit");
+  const [githubInstallationId, setGithubInstallationId] = useState<
+    string | null
+  >(null);
   const [githubUser, setGithubUser] = useState<any>(null);
   const [skipValidation, setSkipValidation] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -323,20 +417,53 @@ export default function EipForm({ onSubmit, initialData, isEditing = false, eipN
             securityConsiderations: initialData.securityConsiderations,
             copyright: initialData.copyright,
           };
-          defaults.mainContent = combineEipSectionsToMarkdown(sectionDataForCombination, defaultMainContent);
+          defaults.mainContent = combineEipSectionsToMarkdown(
+            sectionDataForCombination,
+            defaultMainContent,
+          );
         }
 
-        const preambleFields: Array<keyof Omit<EipFormInitialData, 'mainContent' | 'abstract' | 'motivation' | 'specification' | 'rationale' | 'backwardsCompatibility' | 'testCases' | 'referenceImplementation' | 'securityConsiderations' | 'copyright'> > = [
-          'eip', 'title', 'description', 'author', 'discussionsTo', 'status', 'type', 'category', 'created', 'requires', 'withdrawalReason'
+        const preambleFields: Array<
+          keyof Omit<
+            EipFormInitialData,
+            | "mainContent"
+            | "abstract"
+            | "motivation"
+            | "specification"
+            | "rationale"
+            | "backwardsCompatibility"
+            | "testCases"
+            | "referenceImplementation"
+            | "securityConsiderations"
+            | "copyright"
+          >
+        > = [
+          "eip",
+          "title",
+          "description",
+          "author",
+          "discussionsTo",
+          "status",
+          "type",
+          "category",
+          "created",
+          "requires",
+          "withdrawalReason",
         ];
 
-        preambleFields.forEach(key => {
+        preambleFields.forEach((key) => {
           if (initialData[key] !== undefined && key in defaults) {
             const typedKey = key as keyof EipFormValues;
-            if (key === 'requires' && typeof initialData.requires === 'string') {
-              (defaults.requires as any) = initialData.requires.split(',').map((s: string) => s.trim()).filter((s: string) => s);
+            if (
+              key === "requires" &&
+              typeof initialData.requires === "string"
+            ) {
+              (defaults.requires as any) = initialData.requires
+                .split(",")
+                .map((s: string) => s.trim())
+                .filter((s: string) => s);
             } else {
-               (defaults[typedKey] as any) = initialData[key];
+              (defaults[typedKey] as any) = initialData[key];
             }
           }
         });
@@ -346,32 +473,47 @@ export default function EipForm({ onSubmit, initialData, isEditing = false, eipN
 
     validate: (values: EipFormValues) => {
       // Skip validation in development mode if requested
-      if (process.env.NODE_ENV === 'development' && skipValidation) {
+      if (process.env.NODE_ENV === "development" && skipValidation) {
         return {};
       }
 
       const errors: Record<string, string> = {};
 
-      if (!values.title || values.title.trim() === '') errors.title = "Title is required.";
+      if (!values.title || values.title.trim() === "")
+        errors.title = "Title is required.";
       else {
-        if (values.title.length > 72) errors.title = "Title should be 72 characters or less.";
-        if (values.title.endsWith('.')) errors.title = "Title must not end with a period.";
-        if (/EIP-\d+/.test(values.title)) errors.title = "Title must not include 'EIP-N'.";
+        if (values.title.length > 72)
+          errors.title = "Title should be 72 characters or less.";
+        if (values.title.endsWith("."))
+          errors.title = "Title must not end with a period.";
+        if (/EIP-\d+/.test(values.title))
+          errors.title = "Title must not include 'EIP-N'.";
       }
-      if (!values.description || values.description.trim() === '') errors.description = "Description is required.";
+      if (!values.description || values.description.trim() === "")
+        errors.description = "Description is required.";
       else {
-        if (values.description.includes(':')) errors.description = "Description must not contain colons (':').";
-        if (/(eip|erc)[\s-]*[0-9]+/i.test(values.description)) errors.description = "Description must not EIP/ERC references. Use 'Requires'.";
-        if (/standard[s]?\b/i.test(values.description)) errors.description = "Description must not contain 'standard' or 'standards'.";
-        if (!values.description.endsWith('.')) errors.description = "Description must be a full sentence ending with a period.";
+        if (values.description.includes(":"))
+          errors.description = "Description must not contain colons (':').";
+        if (/(eip|erc)[\s-]*[0-9]+/i.test(values.description))
+          errors.description =
+            "Description must not EIP/ERC references. Use 'Requires'.";
+        if (/standard[s]?\b/i.test(values.description))
+          errors.description =
+            "Description must not contain 'standard' or 'standards'.";
+        if (!values.description.endsWith("."))
+          errors.description =
+            "Description must be a full sentence ending with a period.";
       }
-      if (!values.author || values.author.trim() === '') errors.author = "Author(s) field is required.";
+      if (!values.author || values.author.trim() === "")
+        errors.author = "Author(s) field is required.";
       else {
         const authorParts = values.author.split(/\s*(?:,|and|,\s*and)\s*/i);
-        const authorRegex = /^(?:[^,\(<@]+(?:\s+<[^>@]+@[^>@\s]+>|\s+\(@[a-zA-Z0-9_-]+\))|@[a-zA-Z0-9_-]+)$/;
+        const authorRegex =
+          /^(?:[^,\(<@]+(?:\s+<[^>@]+@[^>@\s]+>|\s+\(@[a-zA-Z0-9_-]+\))|@[a-zA-Z0-9_-]+)$/;
         for (const part of authorParts) {
           if (!authorRegex.test(part.trim())) {
-            errors.author = "Invalid author format. Use 'Name (@github)', 'Name <email@example.com>', or simply '@githubhandle'. Separate with commas or 'and'.";
+            errors.author =
+              "Invalid author format. Use 'Name (@github)', 'Name <email@example.com>', or simply '@githubhandle'. Separate with commas or 'and'.";
             break;
           }
         }
@@ -379,38 +521,74 @@ export default function EipForm({ onSubmit, initialData, isEditing = false, eipN
       if (!values.status) errors.status = "Status is required.";
       if (!values.type) errors.type = "Type is required.";
       if (!values.created) errors.created = "Created date is required.";
-      if (values.created && !/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$/.test(values.created)) errors.created = "Date: YYYY-MM-DD format.";
-      if (values.discussionsTo && !/^https?:\/\/[^\s]+$/.test(values.discussionsTo)) {
+      if (
+        values.created &&
+        !/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$/.test(values.created)
+      )
+        errors.created = "Date: YYYY-MM-DD format.";
+      if (
+        values.discussionsTo &&
+        !/^https?:\/\/[^\s]+$/.test(values.discussionsTo)
+      ) {
         errors.discussionsTo = "Discussions-To must be a valid URL.";
       }
-      if (values.type === "Standards Track" && (!values.category || values.category.trim() === '')) errors.category = "Category is required for Standards Track EIPs.";
-      if (values.status === "Withdrawn" && (!values.withdrawalReason || values.withdrawalReason.trim() === '')) errors.withdrawalReason = "Withdrawal Reason required for Withdrawn EIPs.";
+      if (
+        values.type === "Standards Track" &&
+        (!values.category || values.category.trim() === "")
+      )
+        errors.category = "Category is required for Standards Track EIPs.";
+      if (
+        values.status === "Withdrawn" &&
+        (!values.withdrawalReason || values.withdrawalReason.trim() === "")
+      )
+        errors.withdrawalReason =
+          "Withdrawal Reason required for Withdrawn EIPs.";
       if (values.requires && Array.isArray(values.requires)) {
         for (const req of values.requires) {
-          if (typeof req !== 'string' || !/^\d+$/.test(req)) {
+          if (typeof req !== "string" || !/^\d+$/.test(req)) {
             errors.requires = "Requires: EIP numbers (digits only).";
             break;
           }
         }
       }
 
-      const markdownContent = values.mainContent || '';
-      const missingRequiredSections = requiredSectionsHeaders.filter(sectionHeader =>
-        !markdownContent.includes(sectionHeader)
+      const markdownContent = values.mainContent || "";
+      const missingRequiredSections = requiredSectionsHeaders.filter(
+        (sectionHeader) => !markdownContent.includes(sectionHeader),
       );
 
       if (missingRequiredSections.length > 0) {
-        errors.mainContent = `Missing required sections: ${missingRequiredSections.join(', ')}`;
+        errors.mainContent = `Missing required sections: ${missingRequiredSections.join(", ")}`;
       } else {
         const sections = parseEipSectionsFromMarkdown(markdownContent);
-        if (!sections.abstract || sections.abstract.trim() === '' || sections.abstract.includes('[Provide a short')) {
-          errors.mainContent = "Abstract section must have content (remove placeholder text).";
-        } else if (!sections.specification || sections.specification.trim() === '' || sections.specification.includes('[The technical specification')) {
-          errors.mainContent = "Specification section must have content (remove placeholder text).";
-        } else if (!sections.securityConsiderations || sections.securityConsiderations.trim() === '' || sections.securityConsiderations.includes('[All EIPs must contain')) {
-          errors.mainContent = "Security Considerations section must have content (remove placeholder text).";
-        } else if (!sections.copyright || sections.copyright.trim() === '' || sections.copyright.includes('[Copyright and related rights')) {
-          errors.mainContent = "Copyright section must have content (e.g., Copyright and related rights waived via CC0.).";
+        if (
+          !sections.abstract ||
+          sections.abstract.trim() === "" ||
+          sections.abstract.includes("[Provide a short")
+        ) {
+          errors.mainContent =
+            "Abstract section must have content (remove placeholder text).";
+        } else if (
+          !sections.specification ||
+          sections.specification.trim() === "" ||
+          sections.specification.includes("[The technical specification")
+        ) {
+          errors.mainContent =
+            "Specification section must have content (remove placeholder text).";
+        } else if (
+          !sections.securityConsiderations ||
+          sections.securityConsiderations.trim() === "" ||
+          sections.securityConsiderations.includes("[All EIPs must contain")
+        ) {
+          errors.mainContent =
+            "Security Considerations section must have content (remove placeholder text).";
+        } else if (
+          !sections.copyright ||
+          sections.copyright.trim() === "" ||
+          sections.copyright.includes("[Copyright and related rights")
+        ) {
+          errors.mainContent =
+            "Copyright section must have content (e.g., Copyright and related rights waived via CC0.).";
         }
       }
 
@@ -419,7 +597,7 @@ export default function EipForm({ onSubmit, initialData, isEditing = false, eipN
   });
 
   useEffect(() => {
-    if (activeTab === 'preview') {
+    if (activeTab === "preview") {
       const sections = parseEipSectionsFromMarkdown(form.values.mainContent);
       const tempSubmitData: Partial<EipFormSubmitData> = {
         eip: form.values.eip,
@@ -432,15 +610,21 @@ export default function EipForm({ onSubmit, initialData, isEditing = false, eipN
         category: form.values.category,
         created: form.values.created,
         withdrawalReason: form.values.withdrawalReason,
-        copyright: sections.copyright || 'Copyright and related rights waived via CC0.',
-        requires: Array.isArray(form.values.requires) ? form.values.requires.join(',') : form.values.requires,
-        ...sections
+        copyright:
+          sections.copyright || "Copyright and related rights waived via CC0.",
+        requires: Array.isArray(form.values.requires)
+          ? form.values.requires.join(",")
+          : form.values.requires,
+        ...sections,
       };
 
       if (!tempSubmitData.eip && eipNumber) tempSubmitData.eip = eipNumber;
-      else if (!tempSubmitData.eip && form.values.eip) tempSubmitData.eip = form.values.eip;
+      else if (!tempSubmitData.eip && form.values.eip)
+        tempSubmitData.eip = form.values.eip;
 
-      setPreviewMarkdown(formatEipForSubmit(tempSubmitData as EipFormSubmitData));
+      setPreviewMarkdown(
+        formatEipForSubmit(tempSubmitData as EipFormSubmitData),
+      );
     }
   }, [form.values, activeTab, eipNumber]);
 
@@ -462,19 +646,26 @@ export default function EipForm({ onSubmit, initialData, isEditing = false, eipN
         category: formValues.category,
         created: formValues.created,
         withdrawalReason: formValues.withdrawalReason,
-        copyright: sections.copyright || 'Copyright and related rights waived via CC0.',
-        requires: Array.isArray(formValues.requires) ? formValues.requires.join(',') : formValues.requires,
-        ...sections
+        copyright:
+          sections.copyright || "Copyright and related rights waived via CC0.",
+        requires: Array.isArray(formValues.requires)
+          ? formValues.requires.join(",")
+          : formValues.requires,
+        ...sections,
       } as EipFormSubmitData;
 
       if (!output.eip && eipNumber) output.eip = eipNumber;
       else if (!output.eip && formValues.eip) output.eip = formValues.eip;
 
       const fullMarkdown = formatEipForSubmit(output);
-      const filename = generateEipFilename(output.title, output.eip, output.status);
+      const filename = generateEipFilename(
+        output.title,
+        output.eip,
+        output.status,
+      );
 
       // Get user token from localStorage
-      const userToken = localStorage.getItem('github_token');
+      const userToken = localStorage.getItem("github_token");
 
       // Include GitHub token in submission data
       const submissionData: SubmissionData = {
@@ -483,16 +674,17 @@ export default function EipForm({ onSubmit, initialData, isEditing = false, eipN
         filename,
         githubInstallationId,
         githubUser,
-        userToken
+        userToken,
       };
 
       await onSubmit(submissionData);
     } catch (error) {
-      console.error('Form submission error:', error);
+      console.error("Form submission error:", error);
       notifications.show({
         title: "Submission Error",
-        message: "An error occurred while preparing your submission. Please try again.",
-        color: 'red',
+        message:
+          "An error occurred while preparing your submission. Please try again.",
+        color: "red",
         autoClose: 5000,
       });
     } finally {
@@ -500,10 +692,13 @@ export default function EipForm({ onSubmit, initialData, isEditing = false, eipN
     }
   };
 
-  const handleGitHubAuthChange = useCallback((installationId: string | null, user: any) => {
-    setGithubInstallationId(installationId);
-    setGithubUser(user);
-  }, []);
+  const handleGitHubAuthChange = useCallback(
+    (installationId: string | null, user: any) => {
+      setGithubInstallationId(installationId);
+      setGithubUser(user);
+    },
+    [],
+  );
 
   const fillWithMockData = () => {
     // Fill all form fields with mock data
@@ -525,7 +720,7 @@ export default function EipForm({ onSubmit, initialData, isEditing = false, eipN
       editorRef.current.setMarkdown(mockEipData.mainContent);
     }
 
-    console.log('✅ Form filled with mock EIP data');
+    console.log("✅ Form filled with mock EIP data");
   };
 
   const clearForm = () => {
@@ -537,11 +732,11 @@ export default function EipForm({ onSubmit, initialData, isEditing = false, eipN
       editorRef.current.setMarkdown(defaultMainContent);
     }
 
-    console.log('🗑️ Form cleared');
+    console.log("🗑️ Form cleared");
   };
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div style={{ position: "relative" }}>
       {isSubmitting && (
         <LoadingSpinner
           variant="overlay"
@@ -559,11 +754,12 @@ export default function EipForm({ onSubmit, initialData, isEditing = false, eipN
           <form onSubmit={form.onSubmit(handleFormSubmit)}>
             <Stack gap="lg">
               {/* Development Mode Helper */}
-              {process.env.NODE_ENV === 'development' && (
+              {process.env.NODE_ENV === "development" && (
                 <Alert color="blue" title="Development Mode">
                   <Stack gap="md">
                     <Text size="sm">
-                      Development tools to speed up testing and bypass validation.
+                      Development tools to speed up testing and bypass
+                      validation.
                     </Text>
                     <Group>
                       <Button
@@ -581,7 +777,9 @@ export default function EipForm({ onSubmit, initialData, isEditing = false, eipN
                         onClick={() => setSkipValidation(!skipValidation)}
                         disabled={isSubmitting}
                       >
-                        {skipValidation ? "✅ Validation Disabled" : "⚠️ Enable Skip Validation"}
+                        {skipValidation
+                          ? "✅ Validation Disabled"
+                          : "⚠️ Enable Skip Validation"}
                       </Button>
                       <Button
                         variant="light"
@@ -595,7 +793,8 @@ export default function EipForm({ onSubmit, initialData, isEditing = false, eipN
                     </Group>
                     {skipValidation && (
                       <Text size="xs" c="orange">
-                        ⚠️ Form validation is disabled. You can submit incomplete forms for testing.
+                        ⚠️ Form validation is disabled. You can submit
+                        incomplete forms for testing.
                       </Text>
                     )}
                   </Stack>
@@ -603,89 +802,180 @@ export default function EipForm({ onSubmit, initialData, isEditing = false, eipN
               )}
 
               {/* GitHub Authentication Section */}
-              <Fieldset legend="GitHub Integration">
-                <GitHubAuth onAuthChange={handleGitHubAuthChange} />
-                {!githubInstallationId && (
-                  <Alert color="orange" mt="md">
-                    <Text size="sm">
-                      <IconGitPullRequest size="1rem" style={{ display: 'inline', marginRight: '4px' }} />
-                      Connect your GitHub account to automatically submit EIPs as pull requests.
-                    </Text>
-                  </Alert>
-                )}
-              </Fieldset>
+              {!isEditing && (
+                <Fieldset legend="GitHub Integration">
+                  <GitHubAuth onAuthChange={handleGitHubAuthChange} />
+                  {!githubInstallationId && (
+                    <Alert color="orange" mt="md">
+                      <Text size="sm">
+                        <IconGitPullRequest
+                          size="1rem"
+                          style={{ display: "inline", marginRight: "4px" }}
+                        />
+                        Connect your GitHub account to automatically submit EIPs
+                        as pull requests.
+                      </Text>
+                    </Alert>
+                  )}
+                </Fieldset>
+              )}
 
               <Fieldset legend="Preamble">
-                 <Stack gap="md">
-                      {isEditing && initialData?.eip && (
-                          <TextInput label="EIP Number" disabled value={initialData.eip} />
-                      )}
-                      <TextInput required label="Title" placeholder="EIP title (max 72 chars, not a sentence)" {...form.getInputProps('title')} disabled={isSubmitting} />
-                      <Textarea required label="Description" placeholder="Short, one-sentence description (no colons, no EIP/ERC refs, no 'standard')" {...form.getInputProps('description')} minRows={2} disabled={isSubmitting} />
-                      <TextInput required label="Author(s)" placeholder="Name (@github), Name <email@addr>, @githubhandle" {...form.getInputProps('author')} disabled={isSubmitting} />
-                      <TextInput label="Discussions-To" placeholder="URL to discussion thread" {...form.getInputProps('discussionsTo')} type="url" disabled={isSubmitting} />
-                      <Group grow>
-                          <Select required label="Status" data={eipStatuses} {...form.getInputProps('status')} disabled={isSubmitting} />
-                          <Select required label="Type" data={eipTypes} {...form.getInputProps('type')} disabled={isSubmitting} />
-                      </Group>
-                      {form.values.type === 'Standards Track' && (
-                          <Select required label="Category" placeholder="Select category for Standards Track" data={eipCategories} {...form.getInputProps('category')} disabled={isSubmitting} />
-                      )}
-                      <Group grow>
-                          <TextInput required label="Created Date" placeholder="YYYY-MM-DD" {...form.getInputProps('created')} type="date" disabled={isSubmitting} />
-                          <MultiSelect
-                              label="Requires (Optional)"
-                              placeholder="EIP numbers (e.g., 1, 155)"
-                              data={mockEipReferences}
-                              searchable
-                              clearable
-                              {...form.getInputProps('requires')}
-                              disabled={isSubmitting}
-                          />
-                      </Group>
-                      {form.values.status === 'Withdrawn' && (
-                          <Textarea required label="Withdrawal Reason" placeholder="Reason for withdrawal" {...form.getInputProps('withdrawalReason')} disabled={isSubmitting} />
-                      )}
-                  </Stack>
+                <Stack gap="md">
+                  {isEditing && initialData?.eip && (
+                    <TextInput
+                      label="EIP Number"
+                      disabled
+                      value={initialData.eip}
+                    />
+                  )}
+                  <TextInput
+                    required
+                    label="Title"
+                    placeholder="EIP title (max 72 chars, not a sentence)"
+                    {...form.getInputProps("title")}
+                    disabled={isSubmitting}
+                  />
+                  <Textarea
+                    required
+                    label="Description"
+                    placeholder="Short, one-sentence description (no colons, no EIP/ERC refs, no 'standard')"
+                    {...form.getInputProps("description")}
+                    minRows={2}
+                    disabled={isSubmitting}
+                  />
+                  <TextInput
+                    required
+                    label="Author(s)"
+                    placeholder="Name (@github), Name <email@addr>, @githubhandle"
+                    {...form.getInputProps("author")}
+                    disabled={isSubmitting}
+                  />
+                  <TextInput
+                    label="Discussions-To"
+                    placeholder="URL to discussion thread"
+                    {...form.getInputProps("discussionsTo")}
+                    type="url"
+                    disabled={isSubmitting}
+                  />
+                  <Group grow>
+                    <Select
+                      required
+                      label="Status"
+                      data={eipStatuses}
+                      {...form.getInputProps("status")}
+                      disabled={isSubmitting}
+                    />
+                    <Select
+                      required
+                      label="Type"
+                      data={eipTypes}
+                      {...form.getInputProps("type")}
+                      disabled={isSubmitting}
+                    />
+                  </Group>
+                  {form.values.type === "Standards Track" && (
+                    <Select
+                      required
+                      label="Category"
+                      placeholder="Select category for Standards Track"
+                      data={eipCategories}
+                      {...form.getInputProps("category")}
+                      disabled={isSubmitting}
+                    />
+                  )}
+                  <Group grow>
+                    <TextInput
+                      required
+                      label="Created Date"
+                      placeholder="YYYY-MM-DD"
+                      {...form.getInputProps("created")}
+                      type="date"
+                      disabled={isSubmitting}
+                    />
+                    <MultiSelect
+                      label="Requires (Optional)"
+                      placeholder="EIP numbers (e.g., 1, 155)"
+                      data={mockEipReferences}
+                      searchable
+                      clearable
+                      {...form.getInputProps("requires")}
+                      disabled={isSubmitting}
+                    />
+                  </Group>
+                  {form.values.status === "Withdrawn" && (
+                    <Textarea
+                      required
+                      label="Withdrawal Reason"
+                      placeholder="Reason for withdrawal"
+                      {...form.getInputProps("withdrawalReason")}
+                      disabled={isSubmitting}
+                    />
+                  )}
+                </Stack>
               </Fieldset>
 
               <Fieldset legend="Main Content">
-                  <Stack gap="md">
-                      <Text size="sm" c="dimmed">
-                          Edit the content below. Required sections: Abstract, Specification, Security Considerations, Copyright.
-                          Optional sections: Motivation, Rationale, Backwards Compatibility, Test Cases, Reference Implementation.
-                      </Text>
-                      <Input.Wrapper
-                          label={<>Main Content <Text span c="red">*</Text></>}
-                          error={form.errors.mainContent ? <Text c="red" size="xs">{form.errors.mainContent as string}</Text> : undefined}
-                      >
-                          <MarkdownEditor
-                              editorRef={editorRef}
-                              content={form.values.mainContent || defaultMainContent}
-                              onChange={(markdown) => form.setFieldValue('mainContent', markdown)}
-                          />
-                      </Input.Wrapper>
-                  </Stack>
+                <Stack gap="md">
+                  <Text size="sm" c="dimmed">
+                    Edit the content below. Required sections: Abstract,
+                    Specification, Security Considerations, Copyright. Optional
+                    sections: Motivation, Rationale, Backwards Compatibility,
+                    Test Cases, Reference Implementation.
+                  </Text>
+                  <Input.Wrapper
+                    label={
+                      <>
+                        Main Content{" "}
+                        <Text span c="red">
+                          *
+                        </Text>
+                      </>
+                    }
+                    error={
+                      form.errors.mainContent ? (
+                        <Text c="red" size="xs">
+                          {form.errors.mainContent as string}
+                        </Text>
+                      ) : undefined
+                    }
+                  >
+                    <MarkdownEditor
+                      editorRef={editorRef}
+                      content={form.values.mainContent || defaultMainContent}
+                      onChange={(markdown) =>
+                        form.setFieldValue("mainContent", markdown)
+                      }
+                    />
+                  </Input.Wrapper>
+                </Stack>
               </Fieldset>
 
               <Button
                 type="submit"
                 mt="md"
                 loading={isSubmitting}
-                disabled={!githubInstallationId || !localStorage.getItem('github_token')}
-                leftSection={!isSubmitting ? <IconGitPullRequest size="1rem" /> : undefined}
+                disabled={
+                  !githubInstallationId || !localStorage.getItem("github_token")
+                }
+                leftSection={
+                  !isSubmitting ? <IconGitPullRequest size="1rem" /> : undefined
+                }
               >
                 {isSubmitting
                   ? "Creating Pull Request..."
-                  : (githubInstallationId && localStorage.getItem('github_token'))
-                    ? (isEditing ? "Update EIP (Submit PR)" : "Create EIP (Submit PR)")
-                    : "Complete GitHub Setup to Submit"
-                }
+                  : githubInstallationId && localStorage.getItem("github_token")
+                    ? isEditing
+                      ? "Update EIP (Submit PR)"
+                      : "Create EIP (Submit PR)"
+                    : "Complete GitHub Setup to Submit"}
               </Button>
 
-              {(!githubInstallationId || !localStorage.getItem('github_token')) && (
+              {(!githubInstallationId ||
+                !localStorage.getItem("github_token")) && (
                 <Text size="xs" c="dimmed" ta="center">
-                  Both GitHub App installation and authentication are required to submit EIPs automatically
+                  Both GitHub App installation and authentication are required
+                  to submit EIPs automatically
                 </Text>
               )}
             </Stack>
@@ -693,12 +983,10 @@ export default function EipForm({ onSubmit, initialData, isEditing = false, eipN
         </Tabs.Panel>
 
         <Tabs.Panel value="preview" pt="xs">
-          {activeTab === 'preview' && (
+          {activeTab === "preview" && (
             <Paper p="md" shadow="xs" withBorder>
               <div className="markdown-content">
-                <ReactMarkdown>
-                  {previewMarkdown}
-                </ReactMarkdown>
+                <ReactMarkdown>{previewMarkdown}</ReactMarkdown>
               </div>
             </Paper>
           )}

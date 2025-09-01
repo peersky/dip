@@ -28,6 +28,7 @@ import {
   IconInfoCircle,
   IconChartLine,
   IconGitMerge,
+  IconPencil,
 } from "@tabler/icons-react";
 import { useRouter, useParams } from "next/navigation";
 import {
@@ -43,6 +44,10 @@ import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { ErrorDisplay } from "@/components/shared/ErrorDisplay";
 import { getProtocolConfig } from "@/lib/subdomain-utils";
 import { MarkdownRenderer } from "@/components/shared/MarkdownRenderer";
+import EipForm from "@/components/eips/EipForm";
+import { notifications } from "@mantine/notifications";
+import { GitHubAuth } from "@/components/GitHubAuth";
+import { IconCheck, IconX } from "@tabler/icons-react";
 
 // Matches the rich data structure returned by our new, move-aware API
 interface UnifiedProposal {
@@ -258,6 +263,11 @@ export default function SubdomainSlugDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string | null>("content");
+  const [isEditing, setIsEditing] = useState(false);
+  const [githubInstallationId, setGithubInstallationId] = useState<
+    string | null
+  >(null);
+  const [githubUser, setGithubUser] = useState<{ token: string } | null>(null);
 
   useEffect(() => {
     const loadProposal = async () => {
@@ -293,6 +303,98 @@ export default function SubdomainSlugDetailPage() {
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
+  };
+
+  const handleUpdate = async (
+    data: {
+      rawSubmitData: any;
+      fullMarkdown: string;
+      filename: string;
+    },
+    github: {
+      installationId: string | null;
+      user: { token: string } | null;
+    },
+  ) => {
+    if (!proposal) return;
+    if (!github.installationId || !github.user?.token) {
+      notifications.show({
+        title: "Authentication Error",
+        message: "GitHub App connection is required to submit an update.",
+        color: "red",
+      });
+      return;
+    }
+
+    const submissionId = notifications.show({
+      loading: true,
+      title: "Submitting Update",
+      message: "Creating a pull request...",
+      autoClose: false,
+      withCloseButton: false,
+    });
+
+    try {
+      const response = await fetch(`/api/proposals/${subdomain}/update`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          filename: data.filename,
+          content: data.fullMarkdown,
+          title: data.rawSubmitData.title,
+          description: data.rawSubmitData.description,
+          githubInstallationId: github.installationId,
+          userToken: github.user.token,
+          eipNumber: proposal.proposalNumber,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Failed to create pull request.");
+      }
+
+      notifications.update({
+        id: submissionId,
+        color: "teal",
+        title: "Pull Request Created!",
+        message: (
+          <Text>
+            Your update has been submitted.{" "}
+            <Anchor href={result.pullRequestUrl} target="_blank">
+              View the PR on GitHub
+            </Anchor>
+            .
+          </Text>
+        ),
+        icon: <IconCheck size={16} />,
+        autoClose: 10000,
+      });
+
+      // Optimistically update UI
+      const latestVersion = proposal.versions[0];
+      const updatedVersion = {
+        ...latestVersion,
+        rawMarkdown: data.fullMarkdown,
+      };
+      const updatedProposal = {
+        ...proposal,
+        versions: [updatedVersion, ...proposal.versions.slice(1)],
+        title: data.rawSubmitData.title,
+      };
+      setProposal(updatedProposal as UnifiedProposal);
+      setIsEditing(false);
+    } catch (error: any) {
+      notifications.update({
+        id: submissionId,
+        color: "red",
+        title: "Submission Failed",
+        message: error.message,
+        icon: <IconX size={16} />,
+        autoClose: 5000,
+      });
+    }
   };
 
   if (isLoading) {
@@ -379,6 +481,13 @@ export default function SubdomainSlugDetailPage() {
                   {proposal.title}
                 </Title>
               </div>
+              <Button
+                leftSection={<IconPencil size={14} />}
+                onClick={() => setIsEditing(!isEditing)}
+                variant="outline"
+              >
+                {isEditing ? "Cancel" : "Edit"}
+              </Button>
             </Group>
             <Divider />
             <Grid>
@@ -462,9 +571,57 @@ export default function SubdomainSlugDetailPage() {
           </Tabs.List>
 
           <Tabs.Panel value="content" pt="xl">
-            <Paper p="xl">
-              <MarkdownRenderer content={latestVersion.rawMarkdown} />
-            </Paper>
+            {isEditing ? (
+              <Stack>
+                <Paper withBorder p="md">
+                  <GitHubAuth
+                    onAuthChange={(
+                      installationId: string | null,
+                      user: any,
+                    ) => {
+                      setGithubInstallationId(installationId);
+                      setGithubUser(user as any);
+                    }}
+                  />
+                </Paper>
+                <EipForm
+                  isEditing
+                  eipNumber={proposal.proposalNumber}
+                  initialData={{
+                    title: proposal.title,
+                    author: latestVersion.authors
+                      .map((a: any) => a.author.name || a.author.githubHandle)
+                      .join(", "),
+                    status: latestVersion.status,
+                    type: proposal.type,
+                    category: proposal.category || "",
+                    created: proposal.created || "",
+                    requires: (proposal.requires || []).join(", "),
+                    discussionsTo: proposal.discussionsTo || "",
+                    mainContent: latestVersion.rawMarkdown,
+                    abstract: "",
+                    motivation: "",
+                    specification: "",
+                    rationale: "",
+                    backwardsCompatibility: "",
+                    testCases: "",
+                    referenceImplementation: "",
+                    securityConsiderations: "",
+                    copyright: "",
+                  }}
+                  onSubmit={(data) =>
+                    handleUpdate(data, {
+                      installationId: githubInstallationId,
+                      user: githubUser,
+                    })
+                  }
+                />
+              </Stack>
+            ) : (
+              <Paper p="xl">
+                <MarkdownRenderer content={latestVersion.rawMarkdown} />
+              </Paper>
+            )}
           </Tabs.Panel>
 
           <Tabs.Panel value="history" pt="xl">
