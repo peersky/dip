@@ -305,19 +305,15 @@ export default function SubdomainSlugDetailPage() {
     return new Date(dateString).toLocaleDateString();
   };
 
-  const handleUpdate = async (
-    data: {
-      rawSubmitData: any;
-      fullMarkdown: string;
-      filename: string;
-    },
-    github: {
-      installationId: string | null;
-      user: { token: string } | null;
-    },
-  ) => {
+  const handleUpdate = async (data: {
+    rawSubmitData: any;
+    fullMarkdown: string;
+    filename: string;
+    githubInstallationId: string | null;
+    userToken: string | null;
+  }) => {
     if (!proposal) return;
-    if (!github.installationId || !github.user?.token) {
+    if (!data.githubInstallationId || !data.userToken) {
       notifications.show({
         title: "Authentication Error",
         message: "GitHub App connection is required to submit an update.",
@@ -343,8 +339,8 @@ export default function SubdomainSlugDetailPage() {
           content: data.fullMarkdown,
           title: data.rawSubmitData.title,
           description: data.rawSubmitData.description,
-          githubInstallationId: github.installationId,
-          userToken: github.user.token,
+          githubInstallationId: data.githubInstallationId,
+          userToken: data.userToken,
           eipNumber: proposal.proposalNumber,
         }),
       });
@@ -614,9 +610,10 @@ export default function SubdomainSlugDetailPage() {
                     copyright: "",
                   }}
                   onSubmit={(data) =>
-                    handleUpdate(data, {
-                      installationId: githubInstallationId,
-                      user: githubUser,
+                    handleUpdate({
+                      ...data,
+                      githubInstallationId,
+                      userToken: githubUser?.token || null,
                     })
                   }
                 />

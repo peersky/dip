@@ -965,7 +965,8 @@ export default function EipForm({
                 mt="md"
                 loading={isSubmitting}
                 disabled={
-                  !effectiveInstallationId || !effectiveGithubUser?.token
+                  !effectiveInstallationId ||
+                  !localStorage.getItem("github_token")
                 }
                 leftSection={
                   !isSubmitting ? <IconGitPullRequest size="1rem" /> : undefined
@@ -973,14 +974,16 @@ export default function EipForm({
               >
                 {isSubmitting
                   ? "Creating Pull Request..."
-                  : effectiveInstallationId && effectiveGithubUser?.token
+                  : effectiveInstallationId &&
+                      localStorage.getItem("github_token")
                     ? isEditing
                       ? "Update EIP (Submit PR)"
                       : "Create EIP (Submit PR)"
                     : "Complete GitHub Setup to Submit"}
               </Button>
 
-              {(!effectiveInstallationId || !effectiveGithubUser?.token) && (
+              {(!effectiveInstallationId ||
+                !localStorage.getItem("github_token")) && (
                 <Text size="xs" c="dimmed" ta="center">
                   Both GitHub App installation and authentication are required
                   to submit EIPs automatically
