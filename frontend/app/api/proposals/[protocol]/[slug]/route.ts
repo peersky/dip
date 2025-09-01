@@ -24,10 +24,10 @@ type UnifiedProposal = Proposal & {
 };
 
 interface RouteContext {
-  params: {
+  params: Promise<{
     protocol: string;
     slug: string;
-  };
+  }>;
 }
 
 /**
@@ -108,7 +108,7 @@ async function getUnifiedProposalHistory(
 }
 
 export async function GET(request: NextRequest, { params }: RouteContext) {
-  const { protocol, slug } = params;
+  const { protocol, slug } = await params;
 
   if (!protocol || !slug) {
     return NextResponse.json(

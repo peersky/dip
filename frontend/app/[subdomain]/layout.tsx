@@ -1,15 +1,17 @@
+"use client";
 import { Container, Group, Stack, Text, Title, Button } from "@mantine/core";
 import Link from "next/link";
-import { PropsWithChildren } from "react";
 import { IconArrowLeft } from "@tabler/icons-react";
+import { useParams } from "next/navigation";
 
 export default function SubdomainLayout({
   children,
-  params,
 }: {
   children: React.ReactNode;
-  params: { subdomain: string };
 }) {
+  const params = useParams();
+  const { subdomain } = params;
+
   return (
     <Container size="lg" my="xl">
       <Stack gap="xl">
@@ -25,7 +27,7 @@ export default function SubdomainLayout({
           </Button>
         </Group>
         <Title order={1} style={{ textTransform: "capitalize" }}>
-          {params.subdomain} Protocol
+          {subdomain} Protocol
         </Title>
         {children}
       </Stack>

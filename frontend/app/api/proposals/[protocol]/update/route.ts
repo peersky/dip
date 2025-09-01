@@ -16,7 +16,7 @@ interface UpdateRequestBody {
 
 export async function POST(
   request: NextRequest,
-  context: { params: { protocol: string } },
+  context: { params: Promise<{ protocol: string }> },
 ) {
   const body: UpdateRequestBody = await request.json();
   const {
@@ -28,7 +28,7 @@ export async function POST(
     userToken,
     eipNumber,
   } = body;
-  const { protocol } = context.params;
+  const { protocol } = await context.params;
 
   if (
     !protocol ||
