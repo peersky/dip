@@ -587,6 +587,8 @@ export default function SubdomainSlugDetailPage() {
                 <EipForm
                   isEditing
                   eipNumber={proposal.proposalNumber}
+                  githubInstallationId={githubInstallationId}
+                  githubUser={githubUser}
                   initialData={{
                     title: proposal.title,
                     author: latestVersion.authors

@@ -322,6 +322,8 @@ interface EipFormProps {
   initialData?: EipFormInitialData;
   isEditing?: boolean;
   eipNumber?: string;
+  githubInstallationId?: string | null;
+  githubUser?: any;
 }
 
 const requiredSectionsHeaders = [
@@ -388,6 +390,8 @@ export default function EipForm({
   initialData,
   isEditing = false,
   eipNumber,
+  githubInstallationId: githubInstallationIdFromProp,
+  githubUser: githubUserFromProp,
 }: EipFormProps) {
   const editorRef = useRef<MDXEditorMethods>(null);
   const [previewMarkdown, setPreviewMarkdown] = useState("");
@@ -396,6 +400,10 @@ export default function EipForm({
     string | null
   >(null);
   const [githubUser, setGithubUser] = useState<any>(null);
+
+  const effectiveInstallationId =
+    githubInstallationIdFromProp ?? githubInstallationId;
+  const effectiveGithubUser = githubUserFromProp ?? githubUser;
   const [skipValidation, setSkipValidation] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -664,17 +672,14 @@ export default function EipForm({
         output.status,
       );
 
-      // Get user token from localStorage
-      const userToken = localStorage.getItem("github_token");
-
       // Include GitHub token in submission data
       const submissionData: SubmissionData = {
         rawSubmitData: output,
         fullMarkdown,
         filename,
-        githubInstallationId,
-        githubUser,
-        userToken,
+        githubInstallationId: effectiveInstallationId,
+        githubUser: effectiveGithubUser,
+        userToken: effectiveGithubUser?.token || null,
       };
 
       await onSubmit(submissionData);
@@ -956,7 +961,7 @@ export default function EipForm({
                 mt="md"
                 loading={isSubmitting}
                 disabled={
-                  !githubInstallationId || !localStorage.getItem("github_token")
+                  !effectiveInstallationId || !effectiveGithubUser?.token
                 }
                 leftSection={
                   !isSubmitting ? <IconGitPullRequest size="1rem" /> : undefined
@@ -964,15 +969,14 @@ export default function EipForm({
               >
                 {isSubmitting
                   ? "Creating Pull Request..."
-                  : githubInstallationId && localStorage.getItem("github_token")
+                  : effectiveInstallationId && effectiveGithubUser?.token
                     ? isEditing
                       ? "Update EIP (Submit PR)"
                       : "Create EIP (Submit PR)"
                     : "Complete GitHub Setup to Submit"}
               </Button>
 
-              {(!githubInstallationId ||
-                !localStorage.getItem("github_token")) && (
+              {(!effectiveInstallationId || !effectiveGithubUser?.token) && (
                 <Text size="xs" c="dimmed" ta="center">
                   Both GitHub App installation and authentication are required
                   to submit EIPs automatically
