@@ -29,10 +29,8 @@ export async function GET() {
       date: `${snapshot.year}-${String(snapshot.month).padStart(2, "0")}`,
       Proposals: snapshot.totalProposals,
       Authors: snapshot.distinctAuthorsCount,
-      "Acceptance Rate": parseFloat((snapshot.acceptanceRate * 100).toFixed(2)),
-      "Centralization Rate": parseFloat(
-        (snapshot.centralizationRate * 100).toFixed(2),
-      ),
+      "Acceptance Rate": parseFloat(snapshot.acceptanceRate.toFixed(2)),
+      "Centralization Rate": parseFloat(snapshot.centralizationRate.toFixed(2)),
     }));
 
     return NextResponse.json({
