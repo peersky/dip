@@ -677,16 +677,15 @@ export default function EipForm({
       );
 
       // Include GitHub token in submission data
-      const submissionData: SubmissionData = {
+      const submissionData: Omit<SubmissionData, "githubUser"> = {
         rawSubmitData: output,
         fullMarkdown,
         filename,
         githubInstallationId: effectiveInstallationId,
-        githubUser: effectiveGithubUser,
         userToken: effectiveGithubUser?.token || null,
       };
 
-      await onSubmit(submissionData);
+      await onSubmit(submissionData as any);
     } catch (error) {
       console.error("Form submission error:", error);
       notifications.show({
