@@ -66,17 +66,25 @@ export default function RootLayout({
                     <Header opened={opened} toggle={toggle} />
                   </div>
                   <Group>
-                    <Button component={Link} href="/authors" variant="default">
+                    <Button
+                      component="a"
+                      href="https://dip.box/authors"
+                      variant="default"
+                    >
                       Authors
                     </Button>
                     <Button
-                      component={Link}
-                      href="/maintainers"
+                      component="a"
+                      href="https://dip.box/maintainers"
                       variant="default"
                     >
                       Maintainers
                     </Button>
-                    <Button component={Link} href="/faq" variant="default">
+                    <Button
+                      component="a"
+                      href="https://dip.box/faq"
+                      variant="default"
+                    >
                       About / FAQ
                     </Button>
                   </Group>
