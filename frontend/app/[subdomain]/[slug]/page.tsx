@@ -613,7 +613,7 @@ export default function SubdomainSlugDetailPage() {
                     handleUpdate({
                       ...data,
                       githubInstallationId,
-                      userToken: githubUser?.token || null,
+                      userToken: localStorage.getItem("github_token"),
                     })
                   }
                 />
