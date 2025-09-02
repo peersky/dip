@@ -1,36 +1,58 @@
-'use client';
+"use client";
 
-import { useEffect, useState, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { Container, Title, Text, Button, Stack, Alert, Code, Paper, Center, Loader } from '@mantine/core';
-import { IconCheck, IconX, IconLoader, IconArrowRight } from '@tabler/icons-react';
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import {
+  Container,
+  Title,
+  Text,
+  Button,
+  Stack,
+  Alert,
+  Code,
+  Paper,
+  Center,
+  Loader,
+} from "@mantine/core";
+import {
+  IconCheck,
+  IconX,
+  IconLoader,
+  IconArrowRight,
+} from "@tabler/icons-react";
 
 function GitHubAppCallbackContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [status, setStatus] = useState<"loading" | "success" | "error">(
+    "loading",
+  );
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [installationId, setInstallationId] = useState<string | null>(null);
 
   useEffect(() => {
-    const code = searchParams.get('code');
-    const setupAction = searchParams.get('setup_action');
-    const newInstallationId = searchParams.get('installation_id');
+    const code = searchParams.get("code");
+    const setupAction = searchParams.get("setup_action");
+    const newInstallationId = searchParams.get("installation_id");
 
-    console.log('GitHub App callback params:', { code, setupAction, newInstallationId });
+    console.log("GitHub App callback params:", {
+      code,
+      setupAction,
+      newInstallationId,
+    });
 
     const processCallback = async () => {
       // Handle GitHub App Installation Flow
-      if (setupAction === 'install' && newInstallationId) {
+      if (setupAction === "install" && newInstallationId) {
         try {
           setInstallationId(newInstallationId);
 
           // Fetch installation details to get user info
-          const response = await fetch('/api/auth/github/app/installation', {
-            method: 'POST',
+          const response = await fetch("/api/auth/github/app/installation", {
+            method: "POST",
             headers: {
-              'Content-Type': 'application/json',
+              "Content-Type": "application/json",
             },
             body: JSON.stringify({ installationId: newInstallationId }),
           });
@@ -38,41 +60,35 @@ function GitHubAppCallbackContent() {
           const data = await response.json();
 
           if (response.ok && data.installation && data.user) {
-            setStatus('success');
+            setStatus("success");
 
             // Store installation data
-            localStorage.setItem('github_installation_id', newInstallationId);
-            localStorage.setItem('github_user_data', JSON.stringify(data.user));
+            localStorage.setItem("github_installation_id", newInstallationId);
+            localStorage.setItem("github_user_data", JSON.stringify(data.user));
 
             // Notify parent window if this is a popup
             if (window.opener) {
-              console.log('Sending installation complete message to parent window');
+              console.log(
+                "Sending installation complete message to parent window",
+              );
 
-              // Get the original domain from localStorage or URL state
-              const returnDomain = localStorage.getItem('github_auth_return_domain') ||
-                                 searchParams.get('state') ||
-                                 'dip.box';
+              // Get the original origin from localStorage or URL state
+              const targetOrigin =
+                localStorage.getItem("github_auth_return_domain") ||
+                searchParams.get("state") ||
+                window.location.origin;
 
-              // Determine the target origin for the parent window
-              let targetOrigin = window.location.origin; // Default to same origin
+              console.log("Sending message to target origin:", targetOrigin);
 
-              // If we have a return domain and it's different from current domain
-              if (returnDomain && returnDomain !== window.location.hostname) {
-                if (returnDomain === 'localhost' || returnDomain.includes('localhost')) {
-                  targetOrigin = 'http://localhost:3000';
-                } else {
-                  targetOrigin = `https://${returnDomain}`;
-                }
-              }
-
-              console.log('Sending message to target origin:', targetOrigin);
-
-              window.opener.postMessage({
-                type: 'github-installation-complete',
-                installationId: newInstallationId,
-                user: data.user,
-                installation: data.installation
-              }, targetOrigin);
+              window.opener.postMessage(
+                {
+                  type: "github-installation-complete",
+                  installationId: newInstallationId,
+                  user: data.user,
+                  installation: data.installation,
+                },
+                targetOrigin,
+              );
 
               // Close popup after a short delay
               setTimeout(() => {
@@ -81,29 +97,35 @@ function GitHubAppCallbackContent() {
             } else {
               // Not a popup, redirect to setup page after a delay
               setTimeout(() => {
-                router.push(`/auth/github/app/setup?installation_id=${newInstallationId}`);
+                router.push(
+                  `/auth/github/app/setup?installation_id=${newInstallationId}`,
+                );
               }, 2000);
             }
           } else {
-            setErrorDetails(`Failed to fetch installation details: ${data.error || 'Unknown error'}`);
-            setStatus('error');
+            setErrorDetails(
+              `Failed to fetch installation details: ${data.error || "Unknown error"}`,
+            );
+            setStatus("error");
           }
         } catch (error) {
-          console.error('Error processing installation:', error);
-          setErrorDetails(`Failed to process installation: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          setStatus('error');
+          console.error("Error processing installation:", error);
+          setErrorDetails(
+            `Failed to process installation: ${error instanceof Error ? error.message : "Unknown error"}`,
+          );
+          setStatus("error");
         }
       }
       // Handle OAuth Authentication Flow
       else if (code && !setupAction) {
         try {
-          console.log('Processing OAuth authentication flow');
+          console.log("Processing OAuth authentication flow");
 
           // Exchange code for access token
-          const response = await fetch('/api/auth/github/exchange', {
-            method: 'POST',
+          const response = await fetch("/api/auth/github/exchange", {
+            method: "POST",
             headers: {
-              'Content-Type': 'application/json',
+              "Content-Type": "application/json",
             },
             body: JSON.stringify({ code }),
           });
@@ -111,41 +133,40 @@ function GitHubAppCallbackContent() {
           const data = await response.json();
 
           if (response.ok && data.access_token) {
-            setStatus('success');
+            setStatus("success");
 
             // Store token and user data
-            localStorage.setItem('github_token', data.access_token);
+            localStorage.setItem("github_token", data.access_token);
             if (data.user) {
-              localStorage.setItem('github_user_data', JSON.stringify(data.user));
+              localStorage.setItem(
+                "github_user_data",
+                JSON.stringify(data.user),
+              );
             }
 
             // Notify parent window if this is a popup
             if (window.opener) {
-              console.log('Sending OAuth complete message to parent window');
+              console.log("Sending OAuth complete message to parent window");
 
-              // Get the original domain from localStorage or URL state
-              const returnDomain = localStorage.getItem('github_auth_return_domain') ||
-                                 searchParams.get('state') ||
-                                 'dip.box';
+              // Get the original origin from localStorage or URL state
+              const targetOrigin =
+                localStorage.getItem("github_auth_return_domain") ||
+                searchParams.get("state") ||
+                window.location.origin;
 
-              // Determine the target origin for the parent window
-              let targetOrigin = window.location.origin;
+              console.log(
+                "Sending OAuth message to target origin:",
+                targetOrigin,
+              );
 
-              if (returnDomain && returnDomain !== window.location.hostname) {
-                if (returnDomain === 'localhost' || returnDomain.includes('localhost')) {
-                  targetOrigin = 'http://localhost:3000';
-                } else {
-                  targetOrigin = `https://${returnDomain}`;
-                }
-              }
-
-              console.log('Sending OAuth message to target origin:', targetOrigin);
-
-              window.opener.postMessage({
-                type: 'github-oauth-complete',
-                token: data.access_token,
-                user: data.user
-              }, targetOrigin);
+              window.opener.postMessage(
+                {
+                  type: "github-oauth-complete",
+                  token: data.access_token,
+                  user: data.user,
+                },
+                targetOrigin,
+              );
 
               // Close popup after a short delay
               setTimeout(() => {
@@ -153,42 +174,55 @@ function GitHubAppCallbackContent() {
               }, 1500);
             } else {
               // Get the original domain to redirect back to
-              const returnDomain = localStorage.getItem('github_auth_return_domain');
-              localStorage.removeItem('github_auth_return_domain');
+              const returnOrigin = localStorage.getItem(
+                "github_auth_return_domain",
+              );
+              localStorage.removeItem("github_auth_return_domain");
 
               // Not a popup, redirect appropriately
-              if (returnDomain && returnDomain !== window.location.hostname) {
-                // Redirect back to original subdomain
+              if (returnOrigin) {
+                // Redirect back to original origin
                 setTimeout(() => {
-                  window.location.href = `https://${returnDomain}`;
+                  window.location.href = returnOrigin;
                 }, 2000);
               } else {
                 // Fallback: redirect to home
                 setTimeout(() => {
-                  window.location.href = '/';
+                  window.location.href = "/";
                 }, 2000);
               }
             }
           } else {
-            setErrorDetails(`OAuth authentication failed: ${data.error || 'Unknown error'}`);
-            setStatus('error');
+            setErrorDetails(
+              `OAuth authentication failed: ${data.error || "Unknown error"}`,
+            );
+            setStatus("error");
           }
         } catch (error) {
-          console.error('Error processing OAuth authentication:', error);
-          setErrorDetails(`Failed to process OAuth authentication: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          setStatus('error');
+          console.error("Error processing OAuth authentication:", error);
+          setErrorDetails(
+            `Failed to process OAuth authentication: ${error instanceof Error ? error.message : "Unknown error"}`,
+          );
+          setStatus("error");
         }
       }
       // Handle legacy OAuth code case with warning
       else if (code) {
-        console.warn('Received OAuth code on app installation callback. This might be unexpected.', { code });
-        setErrorDetails('Unexpected callback state. If you were installing the app, please ensure the process completed correctly.');
-        setStatus('error');
+        console.warn(
+          "Received OAuth code on app installation callback. This might be unexpected.",
+          { code },
+        );
+        setErrorDetails(
+          "Unexpected callback state. If you were installing the app, please ensure the process completed correctly.",
+        );
+        setStatus("error");
       }
       // No valid parameters
       else {
-        setErrorDetails('No installation ID or authorization code found in the callback.');
-        setStatus('error');
+        setErrorDetails(
+          "No installation ID or authorization code found in the callback.",
+        );
+        setStatus("error");
       }
     };
 
@@ -200,14 +234,14 @@ function GitHubAppCallbackContent() {
       router.push(`/auth/github/app/setup?installation_id=${installationId}`);
     } else {
       // Fallback or error handling if installationId is not set
-      router.push('/');
+      router.push("/");
     }
   };
 
   return (
     <Container size="sm" py="xl">
       <Stack gap="xl" align="center">
-        {status === 'loading' && (
+        {status === "loading" && (
           <Paper p="xl" withBorder radius="md" w="100%">
             <Stack align="center" gap="md">
               <IconLoader size="2rem" />
@@ -217,8 +251,13 @@ function GitHubAppCallbackContent() {
           </Paper>
         )}
 
-        {status === 'success' && (
-          <Alert icon={<IconCheck size="1.5rem" />} title="GitHub App Installation Successful!" color="green" w="100%">
+        {status === "success" && (
+          <Alert
+            icon={<IconCheck size="1.5rem" />}
+            title="GitHub App Installation Successful!"
+            color="green"
+            w="100%"
+          >
             <Text>
               The GitHub App has been successfully installed and configured.
               {installationId && ` Your Installation ID is: ${installationId}`}
@@ -240,8 +279,13 @@ function GitHubAppCallbackContent() {
           </Alert>
         )}
 
-        {status === 'error' && (
-          <Alert icon={<IconX size="1.5rem" />} title="GitHub App Installation Failed" color="red" w="100%">
+        {status === "error" && (
+          <Alert
+            icon={<IconX size="1.5rem" />}
+            title="GitHub App Installation Failed"
+            color="red"
+            w="100%"
+          >
             <Text>
               There was an issue processing your GitHub App installation.
             </Text>
@@ -250,7 +294,7 @@ function GitHubAppCallbackContent() {
                 {errorDetails}
               </Code>
             )}
-            <Button mt="md" onClick={() => router.push('/')} variant="outline">
+            <Button mt="md" onClick={() => router.push("/")} variant="outline">
               Go to Homepage
             </Button>
           </Alert>
@@ -262,7 +306,13 @@ function GitHubAppCallbackContent() {
 
 export default function GitHubAppCallbackPage() {
   return (
-    <Suspense fallback={<Center h="100vh"><Loader /></Center>}>
+    <Suspense
+      fallback={
+        <Center h="100vh">
+          <Loader />
+        </Center>
+      }
+    >
       <GitHubAppCallbackContent />
     </Suspense>
   );

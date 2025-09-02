@@ -4,7 +4,12 @@ import { prisma } from "@/lib/prisma";
 
 let appOctokit: Octokit | null = null;
 
-function getAppOctokit(): Octokit {
+/**
+ * Creates and memoizes an Octokit instance authenticated as the GitHub App.
+ * This is used for app-level API calls (e.g., getting installation details).
+ * @returns An Octokit instance authenticated with a JWT.
+ */
+export function getAppAuthenticatedOctokit(): Octokit {
   if (appOctokit) {
     return appOctokit;
   }
@@ -13,14 +18,16 @@ function getAppOctokit(): Octokit {
   const privateKey = process.env.GITHUB_APP_PRIVATE_KEY;
 
   if (!appId || !privateKey) {
-    throw new Error("GitHub App credentials are not configured in environment variables.");
+    throw new Error(
+      "GitHub App credentials are not configured in environment variables.",
+    );
   }
 
   appOctokit = new Octokit({
     authStrategy: createAppAuth,
     auth: {
       appId,
-      privateKey,
+      privateKey: privateKey.replace(/\\n/g, "\n"),
     },
   });
 
@@ -33,9 +40,11 @@ function getAppOctokit(): Octokit {
  * @param installationId - The ID of the GitHub App installation.
  * @returns An authenticated Octokit instance.
  */
-export async function getInstallationOctokit(installationId: number): Promise<Octokit | null> {
+export async function getInstallationOctokit(
+  installationId: number,
+): Promise<Octokit | null> {
   try {
-    const appAuth = getAppOctokit();
+    const appAuth = getAppAuthenticatedOctokit();
     const { token } = await (appAuth.auth as any)({
       type: "installation",
       installationId,
@@ -43,7 +52,10 @@ export async function getInstallationOctokit(installationId: number): Promise<Oc
 
     return new Octokit({ auth: token });
   } catch (error) {
-    console.error(`Failed to create Octokit instance for installation ${installationId}:`, error);
+    console.error(
+      `Failed to create Octokit instance for installation ${installationId}:`,
+      error,
+    );
     return null;
   }
 }

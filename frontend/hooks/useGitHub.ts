@@ -32,7 +32,9 @@ interface GitHubInstallationsResponse {
 }
 
 // API functions
-const fetchGitHubInstallations = async (userToken: string): Promise<GitHubInstallationsResponse> => {
+const fetchGitHubInstallations = async (
+  userToken: string,
+): Promise<GitHubInstallationsResponse> => {
   const response = await fetch("/api/github/installations", {
     method: "POST",
     headers: {
@@ -42,8 +44,12 @@ const fetchGitHubInstallations = async (userToken: string): Promise<GitHubInstal
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: "Request failed" }));
-    throw new Error(errorData.error || `Request failed with status: ${response.status}`);
+    const errorData = await response
+      .json()
+      .catch(() => ({ error: "Request failed" }));
+    throw new Error(
+      errorData.error || `Request failed with status: ${response.status}`,
+    );
   }
 
   const data = await response.json();
@@ -65,7 +71,9 @@ const fetchGitHubUser = async (userToken: string): Promise<GitHubUser> => {
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: "Request failed" }));
+    const errorData = await response
+      .json()
+      .catch(() => ({ error: "Request failed" }));
     throw new Error(errorData.error || "Failed to fetch user data");
   }
 
@@ -76,7 +84,8 @@ const fetchGitHubUser = async (userToken: string): Promise<GitHubUser> => {
 // Query keys
 export const githubKeys = {
   all: ["github"] as const,
-  installations: (userToken: string) => [...githubKeys.all, "installations", userToken] as const,
+  installations: (userToken: string) =>
+    [...githubKeys.all, "installations", userToken] as const,
   user: (userToken: string) => [...githubKeys.all, "user", userToken] as const,
 };
 

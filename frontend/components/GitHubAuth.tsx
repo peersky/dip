@@ -1,9 +1,14 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { Button, Text, Group, Alert, Stack } from '@mantine/core';
-import { IconBrandGithub, IconCheck, IconX, IconSettings } from '@tabler/icons-react';
-import { useGitHubInstallations, useGitHubUser } from '@/hooks/useGitHub';
+import { useState, useEffect, useCallback } from "react";
+import { Button, Text, Group, Alert, Stack } from "@mantine/core";
+import {
+  IconBrandGithub,
+  IconCheck,
+  IconX,
+  IconSettings,
+} from "@tabler/icons-react";
+import { useGitHubInstallations, useGitHubUser } from "@/hooks/useGitHub";
 
 interface GitHubAuthProps {
   onAuthChange: (installationId: string | null, user: any) => void;
@@ -21,25 +26,25 @@ export function GitHubAuth({ onAuthChange }: GitHubAuthProps) {
     data: installationsData,
     isLoading: installationsLoading,
     error: installationsError,
-    refetch: refetchInstallations
+    refetch: refetchInstallations,
   } = useGitHubInstallations(userToken);
 
-  const {
-    data: githubUserData,
-    isLoading: userLoading
-  } = useGitHubUser(userToken || '');
+  const { data: githubUserData, isLoading: userLoading } = useGitHubUser(
+    userToken || "",
+  );
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // Check localStorage on mount
   useEffect(() => {
-    console.log('🔄 GitHubAuth useEffect triggered');
+    console.log("🔄 GitHubAuth useEffect triggered");
 
-    const installationId = localStorage.getItem('github_installation_id');
-    const userData = localStorage.getItem('github_user_data');
-    const storedToken = localStorage.getItem('github_token');
+    const installationId = localStorage.getItem("github_installation_id");
+    const userData = localStorage.getItem("github_user_data");
+    const storedToken = localStorage.getItem("github_token");
 
-    console.log('💾 localStorage installationId:', installationId);
-    console.log('💾 localStorage userData:', userData);
-    console.log('💾 localStorage token:', storedToken ? 'present' : 'none');
+    console.log("💾 localStorage installationId:", installationId);
+    console.log("💾 localStorage userData:", userData);
+    console.log("💾 localStorage token:", storedToken ? "present" : "none");
 
     if (storedToken) {
       setUserToken(storedToken);
@@ -48,108 +53,129 @@ export function GitHubAuth({ onAuthChange }: GitHubAuthProps) {
     if (installationId && userData && storedToken) {
       try {
         const parsedUser = JSON.parse(userData);
-        console.log('👤 Parsed user data:', parsedUser);
+        console.log("👤 Parsed user data:", parsedUser);
 
         // For development, trust localStorage data without API verification
-        if (process.env.NODE_ENV === 'development') {
-          console.log('🧪 Development mode: trusting localStorage data');
+        if (process.env.NODE_ENV === "development") {
+          console.log("🧪 Development mode: trusting localStorage data");
           setUser(parsedUser);
           setInstallation({ id: installationId, repositories: [] });
           setIsInstalled(true);
+          setIsAuthenticated(true);
           onAuthChange(installationId, parsedUser);
         }
       } catch (error) {
-        console.error('❌ Failed to parse stored user data:', error);
-        localStorage.removeItem('github_installation_id');
-        localStorage.removeItem('github_user_data');
-        localStorage.removeItem('github_token');
+        console.error("❌ Failed to parse stored user data:", error);
+        localStorage.removeItem("github_installation_id");
+        localStorage.removeItem("github_user_data");
+        localStorage.removeItem("github_token");
       }
     } else {
-      console.log('ℹ️ No complete GitHub setup found (need app install + OAuth)');
+      console.log(
+        "ℹ️ No complete GitHub setup found (need app install + OAuth)",
+      );
     }
-  }, [onAuthChange]);
+  }, []);
 
   // Handle installations data
   useEffect(() => {
     if (installationsData && installationsData.success) {
-      console.log('📡 Installations data received:', installationsData);
+      console.log("📡 Installations data received:", installationsData);
 
-      const storedInstallationId = localStorage.getItem('github_installation_id');
+      const storedInstallationId = localStorage.getItem(
+        "github_installation_id",
+      );
 
       if (installationsData.installations.length > 0) {
         // Find the installation that matches stored ID or use the first one
         const targetInstallation = storedInstallationId
-          ? installationsData.installations.find(inst => inst.id.toString() === storedInstallationId)
+          ? installationsData.installations.find(
+              (inst) => inst.id.toString() === storedInstallationId,
+            )
           : installationsData.installations[0];
 
         if (targetInstallation) {
-          console.log('✅ Installation found:', targetInstallation);
+          console.log("✅ Installation found:", targetInstallation);
           setInstallation(targetInstallation);
           setIsInstalled(true);
 
           // Store installation ID
-          localStorage.setItem('github_installation_id', targetInstallation.id.toString());
+          localStorage.setItem(
+            "github_installation_id",
+            targetInstallation.id.toString(),
+          );
 
-          // Use user data from API if available, otherwise use stored data
-          const currentUser = installationsData.user || user;
-          if (currentUser) {
-            onAuthChange(targetInstallation.id.toString(), currentUser);
+          // Use user data from the API response directly. This hook should
+          // not depend on the local `user` state to avoid dependency cycles.
+          if (installationsData.user) {
+            onAuthChange(
+              targetInstallation.id.toString(),
+              installationsData.user,
+            );
+            setIsAuthenticated(true);
           }
         }
       } else {
-        console.log('⚠️ No installations found');
+        console.log("⚠️ No installations found");
         setIsInstalled(false);
       }
     }
-  }, [installationsData, user, onAuthChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [installationsData]);
 
   // Handle GitHub user data
   useEffect(() => {
     if (githubUserData && userToken) {
-      console.log('👤 GitHub user data received:', githubUserData);
+      console.log("👤 GitHub user data received:", githubUserData);
       setUser(githubUserData);
 
       // Store user data
-      localStorage.setItem('github_user_data', JSON.stringify(githubUserData));
+      localStorage.setItem("github_user_data", JSON.stringify(githubUserData));
 
       // If we have both user and installation, notify parent
-      if (installation) {
-        onAuthChange(installation.id.toString(), githubUserData);
+      // Check localStorage instead of state to avoid dependency loop
+      const installationId = localStorage.getItem("github_installation_id");
+      if (installationId) {
+        onAuthChange(installationId, githubUserData);
+        setIsAuthenticated(true);
       }
     }
-  }, [githubUserData, userToken, installation, onAuthChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [githubUserData, userToken]);
 
   const handleGitHubOAuth = useCallback(() => {
     setLoading(true);
 
     // GitHub OAuth configuration for user authentication
     const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
-    const authDomain = process.env.NEXT_PUBLIC_AUTH_DOMAIN || 'auth.dip.box';
-
+    const authDomain = process.env.NEXT_PUBLIC_AUTH_DOMAIN || "auth.dip.box";
+    console.log("clientId:", clientId);
     if (!clientId) {
-      alert('GitHub OAuth is not configured. Please set NEXT_PUBLIC_GITHUB_CLIENT_ID environment variable.');
+      alert(
+        "GitHub OAuth is not configured. Please set NEXT_PUBLIC_GITHUB_CLIENT_ID environment variable.",
+      );
       setLoading(false);
       return;
     }
 
     let redirectUri: string;
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV === "development") {
       redirectUri = `http://localhost:3000/auth/github/app/callback`;
     } else {
       redirectUri = `https://${authDomain}/auth/github/app/callback`;
     }
 
     // Store the original domain to redirect back after authentication
-    const originalDomain = window.location.hostname;
-    localStorage.setItem('github_auth_return_domain', originalDomain);
+    const originalOrigin = window.location.origin;
+    localStorage.setItem("github_auth_return_domain", originalOrigin);
 
     // GitHub OAuth URL
-    const oauthUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user:email&state=${encodeURIComponent(originalDomain)}`;
+    const oauthUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user:email,public_repo&state=${encodeURIComponent(originalOrigin)}`;
 
-    console.log('🔐 Opening GitHub OAuth:', oauthUrl);
+    console.log("🔐 Opening GitHub OAuth:", oauthUrl);
 
     // Open OAuth in popup
-    const popup = window.open(oauthUrl, 'github-oauth', 'width=600,height=700');
+    const popup = window.open(oauthUrl, "github-oauth", "width=600,height=700");
 
     // Listen for popup close or message
     const checkClosed = setInterval(() => {
@@ -158,7 +184,7 @@ export function GitHubAuth({ onAuthChange }: GitHubAuthProps) {
         setLoading(false);
 
         // Check if token was stored
-        const token = localStorage.getItem('github_token');
+        const token = localStorage.getItem("github_token");
         if (token) {
           setUserToken(token);
           setTimeout(() => {
@@ -173,24 +199,24 @@ export function GitHubAuth({ onAuthChange }: GitHubAuthProps) {
       const allowedOrigins = [
         window.location.origin,
         `https://${authDomain}`,
-        'http://localhost:3000'
+        "http://localhost:3000",
       ];
 
       if (!allowedOrigins.includes(event.origin)) {
-        console.warn('Message from unauthorized origin:', event.origin);
+        console.warn("Message from unauthorized origin:", event.origin);
         return;
       }
 
-      if (event.data.type === 'github-oauth-complete') {
+      if (event.data.type === "github-oauth-complete") {
         clearInterval(checkClosed);
         popup?.close();
-        window.removeEventListener('message', handleMessage);
+        window.removeEventListener("message", handleMessage);
         setLoading(false);
 
-        console.log('✅ OAuth completed');
+        console.log("✅ OAuth completed");
 
         if (event.data.token) {
-          localStorage.setItem('github_token', event.data.token);
+          localStorage.setItem("github_token", event.data.token);
           setUserToken(event.data.token);
 
           // Refetch installations now that we have auth
@@ -201,12 +227,12 @@ export function GitHubAuth({ onAuthChange }: GitHubAuthProps) {
       }
     };
 
-    window.addEventListener('message', handleMessage);
+    window.addEventListener("message", handleMessage);
 
     // Cleanup function
     const cleanup = () => {
       clearInterval(checkClosed);
-      window.removeEventListener('message', handleMessage);
+      window.removeEventListener("message", handleMessage);
       setLoading(false);
     };
 
@@ -222,36 +248,43 @@ export function GitHubAuth({ onAuthChange }: GitHubAuthProps) {
     setLoading(true);
 
     // GitHub App configuration
-    const appName = process.env.NEXT_PUBLIC_GITHUB_APP_NAME || 'improvement-proposals-bot';
+    const appName =
+      process.env.NEXT_PUBLIC_GITHUB_APP_NAME || "improvement-proposals-bot";
 
     // Always use the centralized auth domain for the callback
-    const authDomain = process.env.NEXT_PUBLIC_AUTH_DOMAIN || 'auth.dip.box';
+    const authDomain = process.env.NEXT_PUBLIC_AUTH_DOMAIN || "auth.dip.box";
     let redirectUri: string;
 
-    if (process.env.NODE_ENV === 'development') {
-      redirectUri = `http://localhost:3000/auth/github/app/callback`;
-    } else {
-      redirectUri = `https://${authDomain}/auth/github/app/callback`;
-    }
-
+    // if (process.env.NODE_ENV === "development") {
+    //   redirectUri = `http://localhost:3000/auth/github/app/callback`;
+    // } else {
+    redirectUri = `https://${authDomain}/auth/github/app/callback`;
+    // }
+    console.log("Redirect URI:", redirectUri);
     // Store the original domain to redirect back after installation
-    const originalDomain = window.location.hostname;
-    localStorage.setItem('github_auth_return_domain', originalDomain);
+    const originalOrigin = window.location.origin;
+    localStorage.setItem("github_auth_return_domain", originalOrigin);
 
     if (!appName) {
-      alert('GitHub App is not configured. Please set NEXT_PUBLIC_GITHUB_APP_NAME environment variable.');
+      alert(
+        "GitHub App is not configured. Please set NEXT_PUBLIC_GITHUB_APP_NAME environment variable.",
+      );
       setLoading(false);
       return;
     }
 
     // GitHub App installation URL with proper redirect_uri
-    const installUrl = `https://github.com/apps/${appName}/installations/new?state=${encodeURIComponent(originalDomain)}`;
+    const installUrl = `https://github.com/apps/${appName}/installations/new?state=${encodeURIComponent(originalOrigin)}`;
 
-    console.log('🔗 Opening GitHub App installation:', installUrl);
-    console.log('📍 Callback will redirect to:', redirectUri);
+    console.log("🔗 Opening GitHub App installation:", installUrl);
+    console.log("📍 Callback will redirect to:", redirectUri);
 
     // Open GitHub App installation in popup
-    const popup = window.open(installUrl, 'github-install', 'width=800,height=700');
+    const popup = window.open(
+      installUrl,
+      "github-install",
+      "width=800,height=700",
+    );
 
     // Listen for popup close or message
     const checkClosed = setInterval(() => {
@@ -272,28 +305,34 @@ export function GitHubAuth({ onAuthChange }: GitHubAuthProps) {
       const allowedOrigins = [
         window.location.origin,
         `https://${authDomain}`,
-        'http://localhost:3000'
+        "http://localhost:3000",
       ];
 
       if (!allowedOrigins.includes(event.origin)) {
-        console.warn('Message from unauthorized origin:', event.origin);
+        console.warn("Message from unauthorized origin:", event.origin);
         return;
       }
 
-      if (event.data.type === 'github-installation-complete') {
+      if (event.data.type === "github-installation-complete") {
         clearInterval(checkClosed);
         popup?.close();
-        window.removeEventListener('message', handleMessage);
+        window.removeEventListener("message", handleMessage);
         setLoading(false);
 
-        console.log('✅ Installation completed, refreshing data...');
+        console.log("✅ Installation completed, refreshing data...");
 
         // Store the installation data
         if (event.data.installationId) {
-          localStorage.setItem('github_installation_id', event.data.installationId);
+          localStorage.setItem(
+            "github_installation_id",
+            event.data.installationId,
+          );
         }
         if (event.data.user) {
-          localStorage.setItem('github_user_data', JSON.stringify(event.data.user));
+          localStorage.setItem(
+            "github_user_data",
+            JSON.stringify(event.data.user),
+          );
           setUserToken(event.data.user.token);
           setUser(event.data.user);
         }
@@ -314,12 +353,12 @@ export function GitHubAuth({ onAuthChange }: GitHubAuthProps) {
       }
     };
 
-    window.addEventListener('message', handleMessage);
+    window.addEventListener("message", handleMessage);
 
     // Cleanup function to remove event listener if component unmounts
     const cleanup = () => {
       clearInterval(checkClosed);
-      window.removeEventListener('message', handleMessage);
+      window.removeEventListener("message", handleMessage);
       setLoading(false);
     };
 
@@ -334,25 +373,27 @@ export function GitHubAuth({ onAuthChange }: GitHubAuthProps) {
   }, [refetchInstallations, onAuthChange]);
 
   const handleManageInstallation = useCallback(() => {
-    const appName = process.env.NEXT_PUBLIC_GITHUB_APP_NAME || 'improvement-proposals-bot';
+    const appName =
+      process.env.NEXT_PUBLIC_GITHUB_APP_NAME || "improvement-proposals-bot";
     const manageUrl = `https://github.com/apps/${appName}`;
-    window.open(manageUrl, '_blank');
+    window.open(manageUrl, "_blank");
   }, []);
 
   const handleRefreshInstallation = useCallback(() => {
-    console.log('🔄 Refreshing GitHub installation data...');
+    console.log("🔄 Refreshing GitHub installation data...");
     refetchInstallations();
   }, [refetchInstallations]);
 
   const handleDisconnect = useCallback(() => {
-    console.log('🔌 Disconnecting GitHub integration...');
-    localStorage.removeItem('github_installation_id');
-    localStorage.removeItem('github_user_data');
-    localStorage.removeItem('github_token');
+    console.log("🔌 Disconnecting GitHub integration...");
+    localStorage.removeItem("github_installation_id");
+    localStorage.removeItem("github_user_data");
+    localStorage.removeItem("github_token");
     setUser(null);
     setInstallation(null);
     setIsInstalled(false);
     setUserToken(null);
+    setIsAuthenticated(false);
     onAuthChange(null, null);
   }, [onAuthChange]);
 
@@ -363,7 +404,8 @@ export function GitHubAuth({ onAuthChange }: GitHubAuthProps) {
       <Alert color="red" title="GitHub Connection Error">
         <Stack gap="sm">
           <Text size="sm">
-            Failed to check GitHub App installation: {installationsError.message}
+            Failed to check GitHub App installation:{" "}
+            {installationsError.message}
           </Text>
           <Button size="sm" variant="light" onClick={handleRefreshInstallation}>
             Retry
@@ -373,12 +415,17 @@ export function GitHubAuth({ onAuthChange }: GitHubAuthProps) {
     );
   }
 
-  if (isInstalled && user && installation) {
+  if (isInstalled && isAuthenticated && user && installation) {
     return (
-      <Alert color="green" title="GitHub Connected" icon={<IconCheck size="1rem" />}>
+      <Alert
+        color="green"
+        title="GitHub Connected"
+        icon={<IconCheck size="1rem" />}
+      >
         <Stack gap="sm">
           <Text size="sm">
-            Connected as <strong>{user.login}</strong> via GitHub App installation
+            Connected as <strong>{user.login}</strong> via GitHub App
+            installation
           </Text>
           <Group gap="sm">
             <Button
@@ -426,7 +473,7 @@ export function GitHubAuth({ onAuthChange }: GitHubAuthProps) {
             loading={isLoading}
             disabled={isLoading}
           >
-            {isLoading ? 'Installing...' : 'Install GitHub App'}
+            {isLoading ? "Installing..." : "Install GitHub App"}
           </Button>
         </Stack>
       </Alert>
@@ -434,12 +481,17 @@ export function GitHubAuth({ onAuthChange }: GitHubAuthProps) {
   }
 
   // Show app install needed if we have installations data but user needs OAuth
-  if (!userToken && (localStorage.getItem('github_installation_id') || localStorage.getItem('github_user_data'))) {
+  if (
+    !userToken &&
+    (localStorage.getItem("github_installation_id") ||
+      localStorage.getItem("github_user_data"))
+  ) {
     return (
       <Alert color="orange" title="GitHub Authentication Required">
         <Stack gap="md">
           <Text size="sm">
-            We found GitHub App installations but need to authenticate you to access them securely.
+            We found GitHub App installations but need to authenticate you to
+            access them securely.
           </Text>
           <Group gap="sm">
             <Button
@@ -448,7 +500,7 @@ export function GitHubAuth({ onAuthChange }: GitHubAuthProps) {
               loading={isLoading}
               disabled={isLoading}
             >
-              {isLoading ? 'Authenticating...' : 'Authenticate with GitHub'}
+              {isLoading ? "Authenticating..." : "Authenticate with GitHub"}
             </Button>
             <Button
               variant="outline"
@@ -468,8 +520,9 @@ export function GitHubAuth({ onAuthChange }: GitHubAuthProps) {
     <Alert color="blue" title="GitHub Integration">
       <Stack gap="md">
         <Text size="sm">
-          Connect your GitHub account to automatically submit EIPs as pull requests to the repository.
-          This requires both installing our GitHub App and authenticating your account.
+          Connect your GitHub account to automatically submit EIPs as pull
+          requests to the repository. This requires both installing our GitHub
+          App and authenticating your account.
         </Text>
         <Group gap="sm">
           <Button
@@ -478,7 +531,7 @@ export function GitHubAuth({ onAuthChange }: GitHubAuthProps) {
             loading={isLoading}
             disabled={isLoading}
           >
-            {isLoading ? 'Installing...' : 'Install GitHub App'}
+            {isLoading ? "Installing..." : "Install GitHub App"}
           </Button>
           <Button
             variant="outline"
@@ -486,11 +539,12 @@ export function GitHubAuth({ onAuthChange }: GitHubAuthProps) {
             loading={isLoading}
             disabled={isLoading}
           >
-            {isLoading ? 'Authenticating...' : 'Authenticate'}
+            {isLoading ? "Authenticating..." : "Authenticate"}
           </Button>
         </Group>
         <Text size="xs" c="dimmed">
-          💡 You can do these in any order. Both are required for full functionality.
+          💡 You can do these in any order. Both are required for full
+          functionality.
         </Text>
       </Stack>
     </Alert>

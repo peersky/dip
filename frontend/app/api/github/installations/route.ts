@@ -6,14 +6,20 @@ export async function POST(request: Request) {
     const { userToken } = await request.json();
 
     if (!userToken) {
-      return NextResponse.json({ error: "User authentication required" }, { status: 401 });
+      return NextResponse.json(
+        { error: "User authentication required" },
+        { status: 401 },
+      );
     }
 
     const appId = process.env.GITHUB_APP_ID;
     const privateKey = process.env.GITHUB_APP_PRIVATE_KEY;
 
     if (!appId || !privateKey) {
-      return NextResponse.json({ error: "GitHub App not configured" }, { status: 500 });
+      return NextResponse.json(
+        { error: "GitHub App not configured" },
+        { status: 500 },
+      );
     }
 
     // First, verify the user token and get user info
@@ -26,7 +32,10 @@ export async function POST(request: Request) {
     });
 
     if (!userResponse.ok) {
-      return NextResponse.json({ error: "Invalid user token" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Invalid user token" },
+        { status: 401 },
+      );
     }
 
     const userData = await userResponse.json();
@@ -39,14 +48,18 @@ export async function POST(request: Request) {
     });
 
     // Get all installations for this app (this requires app-level access)
-    const { data: installations } = await app.octokit.rest.apps.listInstallations();
+    const { data: installations } =
+      await app.octokit.rest.apps.listInstallations();
 
     // Filter installations to only include those belonging to the authenticated user
     const userInstallations = installations.filter((installation) => {
       if (!installation.account) return false;
 
       // Check if installation belongs to this user (using safe property access)
-      const accountLogin = installation.account!.login || (installation.account as any).slug || "unknown";
+      const accountLogin =
+        installation.account!.login ||
+        (installation.account as any).slug ||
+        "unknown";
 
       // For personal accounts, check direct ownership
       if (installation.account.type === "User") {
@@ -58,22 +71,35 @@ export async function POST(request: Request) {
       return true; // We'll verify access when they try to use specific installations
     });
 
-    console.log(`📊 Found ${userInstallations.length} installations for user ${userData.login}`);
+    console.log(
+      `📊 Found ${userInstallations.length} installations for user ${userData.login}`,
+    );
 
     // Get detailed info for each user installation
     const installationDetails = await Promise.all(
       userInstallations.map(async (installation) => {
         try {
-          const installationOctokit = await app.getInstallationOctokit(installation.id);
-          const { data: repositories } = await installationOctokit.rest.apps.listReposAccessibleToInstallation();
+          const installationOctokit = await app.getInstallationOctokit(
+            installation.id,
+          );
+          const { data: repositories } =
+            await installationOctokit.rest.apps.listReposAccessibleToInstallation();
 
-          const accountLogin = "login" in installation.account! ? installation.account!.login : "slug" in installation.account! ? (installation.account as any).slug : "unknown";
+          const accountLogin =
+            "login" in installation.account!
+              ? installation.account!.login
+              : "slug" in installation.account!
+                ? (installation.account as any).slug
+                : "unknown";
 
           return {
             id: installation.id,
             account: accountLogin,
             type: installation.account!.type || "Organization",
-            repositories_count: installation.repository_selection === "all" ? "all" : repositories.repositories.length,
+            repositories_count:
+              installation.repository_selection === "all"
+                ? "all"
+                : repositories.repositories.length,
             repositories: repositories.repositories.map((repo) => ({
               id: repo.id,
               name: repo.name,
@@ -84,10 +110,13 @@ export async function POST(request: Request) {
             updated_at: installation.updated_at,
           };
         } catch (error) {
-          console.warn(`Could not access installation ${installation.id}:`, error);
+          console.warn(
+            `Could not access installation ${installation.id}:`,
+            error,
+          );
           return null;
         }
-      })
+      }),
     );
 
     // Filter out failed installations
@@ -112,7 +141,7 @@ export async function POST(request: Request) {
         error: "Failed to fetch installations",
         details: error.message,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -123,6 +152,6 @@ export async function GET() {
     {
       error: "This endpoint requires POST with user authentication token",
     },
-    { status: 405 }
+    { status: 405 },
   );
 }

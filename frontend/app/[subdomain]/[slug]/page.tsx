@@ -95,6 +95,40 @@ const statusColors: Record<string, string> = {
   Deleted: "red",
 };
 
+const parseDescriptionFromMarkdown = (markdown: string): string => {
+  try {
+    const frontmatterMatch = markdown.match(/---\s*([\s\S]*?)\s*---/);
+    if (!frontmatterMatch) return "";
+
+    const frontmatter = frontmatterMatch[1];
+    const lines = frontmatter.split("\n");
+    for (const line of lines) {
+      if (line.startsWith("description:")) {
+        return line
+          .substring("description:".length)
+          .trim()
+          .replace(/^['"]|['"]$/g, "");
+      }
+    }
+  } catch (e) {
+    console.error("Failed to parse description from markdown", e);
+  }
+  return "";
+};
+
+const formatAuthorsForForm = (
+  authors: { author: { name: string | null; githubHandle: string | null } }[],
+): string => {
+  return authors
+    .map(({ author }) => {
+      if (author.name && author.githubHandle) {
+        return `${author.name} (@${author.githubHandle})`;
+      }
+      return author.name || author.githubHandle || "";
+    })
+    .join(", ");
+};
+
 function AnalyticsView({ proposal }: { proposal: UnifiedProposal }) {
   const analytics = useMemo(() => {
     if (!proposal || proposal.versions.length < 1) {
@@ -426,6 +460,8 @@ export default function SubdomainSlugDetailPage() {
   }
 
   const latestVersion = proposal.versions[0];
+  const description = parseDescriptionFromMarkdown(latestVersion.rawMarkdown);
+
   const breadcrumbItems = [
     { title: `${protocolConfig.name} Proposals`, href: `/` },
     { title: slug, href: "#" },
@@ -587,9 +623,8 @@ export default function SubdomainSlugDetailPage() {
                   githubUser={githubUser}
                   initialData={{
                     title: proposal.title,
-                    author: latestVersion.authors
-                      .map((a: any) => a.author.name || a.author.githubHandle)
-                      .join(", "),
+                    author: formatAuthorsForForm(latestVersion.authors),
+                    description: description,
                     status: latestVersion.status,
                     type: proposal.type,
                     category: proposal.category || "",
@@ -634,7 +669,8 @@ export default function SubdomainSlugDetailPage() {
                   bulletSize={18}
                   lineWidth={2}
                 >
-                  {proposal.versions.map((version, index) => {
+                  {proposal.versions.flatMap((version, index) => {
+                    const items = [];
                     const prevVersion =
                       index < proposal.versions.length - 1
                         ? proposal.versions[index + 1]
@@ -645,55 +681,56 @@ export default function SubdomainSlugDetailPage() {
                         version.repositoryOwner !==
                           prevVersion.repositoryOwner);
 
-                    return (
-                      <>
-                        {repoChanged && (
-                          <Timeline.Item
-                            bullet={<IconGitMerge size={12} />}
-                            title={`Moved to ${version.repositoryOwner}/${version.repositoryRepo}`}
-                          >
-                            <Text c="dimmed" size="xs">
-                              Proposal is now tracked as{" "}
-                              {version.proposalSlug.toUpperCase()}
-                            </Text>
-                          </Timeline.Item>
-                        )}
+                    if (repoChanged) {
+                      items.push(
                         <Timeline.Item
-                          key={version.id}
-                          title={
-                            <Group justify="space-between">
-                              <Text fw={500} size="md">
-                                Status: {version.status}
-                              </Text>
-                              <Anchor
-                                href={`https://github.com/${version.repositoryOwner}/${version.repositoryRepo}/commit/${version.commitSha}`}
-                                target="_blank"
-                                size="sm"
-                              >
-                                <Group gap="xs" align="center">
-                                  <Text style={{ fontFamily: "monospace" }}>
-                                    {version.commitSha.substring(0, 7)}
-                                  </Text>
-                                  <IconExternalLink size="0.9rem" />
-                                </Group>
-                              </Anchor>
-                            </Group>
-                          }
+                          key={`${version.id}-moved`}
+                          bullet={<IconGitMerge size={12} />}
+                          title={`Moved to ${version.repositoryOwner}/${version.repositoryRepo}`}
                         >
-                          <Text c="dimmed" size="sm">
-                            Authored by{" "}
-                            {version.authors
-                              .map(
-                                (a) => a.author.name || a.author.githubHandle,
-                              )
-                              .join(", ") || "N/A"}
+                          <Text c="dimmed" size="xs">
+                            Proposal is now tracked as{" "}
+                            {version.proposalSlug.toUpperCase()}
                           </Text>
-                          <Text size="xs" mt={4}>
-                            {formatDate(version.commitDate)}
-                          </Text>
-                        </Timeline.Item>
-                      </>
+                        </Timeline.Item>,
+                      );
+                    }
+
+                    items.push(
+                      <Timeline.Item
+                        key={version.id}
+                        title={
+                          <Group justify="space-between">
+                            <Text fw={500} size="md">
+                              Status: {version.status}
+                            </Text>
+                            <Anchor
+                              href={`https://github.com/${version.repositoryOwner}/${version.repositoryRepo}/commit/${version.commitSha}`}
+                              target="_blank"
+                              size="sm"
+                            >
+                              <Group gap="xs" align="center">
+                                <Text style={{ fontFamily: "monospace" }}>
+                                  {version.commitSha.substring(0, 7)}
+                                </Text>
+                                <IconExternalLink size="0.9rem" />
+                              </Group>
+                            </Anchor>
+                          </Group>
+                        }
+                      >
+                        <Text c="dimmed" size="sm">
+                          Authored by{" "}
+                          {version.authors
+                            .map((a) => a.author.name || a.author.githubHandle)
+                            .join(", ") || "N/A"}
+                        </Text>
+                        <Text size="xs" mt={4}>
+                          {formatDate(version.commitDate)}
+                        </Text>
+                      </Timeline.Item>,
                     );
+                    return items;
                   })}
                 </Timeline>
               </Stack>
