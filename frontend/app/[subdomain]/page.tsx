@@ -856,47 +856,39 @@ export default function SubdomainProtocolPage() {
   const protocolConfig = getProtocolConfig(subdomain);
 
   return (
-    <Container size="xl" py="xl">
-      <Stack gap="xl">
-        <Box>
-          <Title order={1}>{protocolConfig.name} Protocol Dashboard</Title>
-          <Text c="dimmed" mt="xs">
-            {protocolConfig.description}
-          </Text>
-        </Box>
+    <>
+      <Box>
+        <Title order={1}>{protocolConfig.name} Protocol Dashboard</Title>
+        <Text c="dimmed" mt="xs">
+          {protocolConfig.description}
+        </Text>
+      </Box>
 
-        <Tabs defaultValue="proposals">
-          <Tabs.List>
-            <Tabs.Tab value="proposals" leftSection={<IconList size={16} />}>
-              Proposals
-            </Tabs.Tab>
-            <Tabs.Tab
-              value="statistics"
-              leftSection={<IconChartBar size={16} />}
-            >
-              Statistics
-            </Tabs.Tab>
-            <Tabs.Tab
-              value="analytics"
-              leftSection={<IconChartLine size={16} />}
-            >
-              Analytics
-            </Tabs.Tab>
-          </Tabs.List>
+      <Tabs defaultValue="proposals">
+        <Tabs.List>
+          <Tabs.Tab value="proposals" leftSection={<IconList size={16} />}>
+            Proposals
+          </Tabs.Tab>
+          <Tabs.Tab value="statistics" leftSection={<IconChartBar size={16} />}>
+            Statistics
+          </Tabs.Tab>
+          <Tabs.Tab value="analytics" leftSection={<IconChartLine size={16} />}>
+            Analytics
+          </Tabs.Tab>
+        </Tabs.List>
 
-          <Tabs.Panel value="proposals" pt="xl">
-            <ProposalsList protocol={subdomain} />
-          </Tabs.Panel>
+        <Tabs.Panel value="proposals" pt="xl">
+          <ProposalsList protocol={subdomain} />
+        </Tabs.Panel>
 
-          <Tabs.Panel value="statistics" pt="xl">
-            <StatisticsView protocol={subdomain} />
-          </Tabs.Panel>
+        <Tabs.Panel value="statistics" pt="xl">
+          <StatisticsView protocol={subdomain} />
+        </Tabs.Panel>
 
-          <Tabs.Panel value="analytics" pt="xl">
-            <AnalyticsView protocol={subdomain} />
-          </Tabs.Panel>
-        </Tabs>
-      </Stack>
-    </Container>
+        <Tabs.Panel value="analytics" pt="xl">
+          <AnalyticsView protocol={subdomain} />
+        </Tabs.Panel>
+      </Tabs>
+    </>
   );
 }
