@@ -652,7 +652,7 @@ export default function EipForm({
         title: formValues.title,
         description: formValues.description,
         author: formValues.author,
-        discussionsTo: formValues.discussionsTo,
+        "discussions-to": formValues.discussionsTo,
         status: formValues.status,
         type: formValues.type,
         category: formValues.category,
@@ -669,7 +669,27 @@ export default function EipForm({
       if (!output.eip && eipNumber) output.eip = eipNumber;
       else if (!output.eip && formValues.eip) output.eip = formValues.eip;
 
-      const fullMarkdown = formatEipForSubmit(output);
+      const finalMainContent = isEditing
+        ? combineEipSectionsToMarkdown(
+            {
+              abstract: sections.abstract,
+              motivation: sections.motivation,
+              specification: sections.specification,
+              rationale: sections.rationale,
+              backwardsCompatibility: sections.backwardsCompatibility,
+              testCases: sections.testCases,
+              referenceImplementation: sections.referenceImplementation,
+              securityConsiderations: sections.securityConsiderations,
+              copyright: sections.copyright,
+            },
+            defaultMainContent,
+          )
+        : formValues.mainContent;
+
+      const fullMarkdown = formatEipForSubmit({
+        ...output,
+        mainContent: finalMainContent,
+      });
       const filename = generateEipFilename(
         output.title,
         output.eip,
