@@ -686,10 +686,7 @@ export default function EipForm({
           )
         : formValues.mainContent;
 
-      const fullMarkdown = formatEipForSubmit({
-        ...output,
-        mainContent: finalMainContent,
-      });
+      const fullMarkdown = formatEipForSubmit(output);
       const filename = generateEipFilename(
         output.title,
         output.eip,
