@@ -5,3 +5,4 @@
   "buildCommand": "cd .. && pnpm --filter @peeramid-labs/dip-database build && cd frontend && pnpm run build",
   "outputDirectory": ".next"
 }
+

@@ -669,22 +669,12 @@ export default function EipForm({
       if (!output.eip && eipNumber) output.eip = eipNumber;
       else if (!output.eip && formValues.eip) output.eip = formValues.eip;
 
-      const finalMainContent = isEditing
-        ? combineEipSectionsToMarkdown(
-            {
-              abstract: sections.abstract,
-              motivation: sections.motivation,
-              specification: sections.specification,
-              rationale: sections.rationale,
-              backwardsCompatibility: sections.backwardsCompatibility,
-              testCases: sections.testCases,
-              referenceImplementation: sections.referenceImplementation,
-              securityConsiderations: sections.securityConsiderations,
-              copyright: sections.copyright,
-            },
-            defaultMainContent,
-          )
-        : formValues.mainContent;
+      // Update the output object with the parsed sections so formatEipForSubmit can build the body
+      Object.keys(sections).forEach((key) => {
+        if (sections[key as keyof typeof sections]) {
+          (output as any)[key] = sections[key as keyof typeof sections];
+        }
+      });
 
       const fullMarkdown = formatEipForSubmit(output);
       const filename = generateEipFilename(
