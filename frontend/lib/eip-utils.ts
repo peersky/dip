@@ -109,7 +109,7 @@ ${bodyString}\n`; // Ensure a trailing newline
 export function generateEipFilename(
   title: string | undefined,
   eipNumber?: string | number | null,
-  // status?: string,
+  status?: string,
 ): string {
   if (eipNumber) {
     // For existing, non-draft EIPs
