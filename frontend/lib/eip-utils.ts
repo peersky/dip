@@ -18,14 +18,26 @@ const PREAMBLE_ORDER: Array<keyof EipFormSubmitData> = [
 
 // Defines the order of main content sections
 // These should match the keys in EipFormSubmitData for the content parts
-const SECTION_ORDER: Array<{ key: keyof EipFormSubmitData; title: string; optional?: boolean }> = [
+const SECTION_ORDER: Array<{
+  key: keyof EipFormSubmitData;
+  title: string;
+  optional?: boolean;
+}> = [
   { key: "abstract", title: "Abstract" },
   { key: "motivation", title: "Motivation", optional: true },
   { key: "specification", title: "Specification" },
   { key: "rationale", title: "Rationale", optional: true },
-  { key: "backwardsCompatibility", title: "Backwards Compatibility", optional: true },
+  {
+    key: "backwardsCompatibility",
+    title: "Backwards Compatibility",
+    optional: true,
+  },
   { key: "testCases", title: "Test Cases", optional: true },
-  { key: "referenceImplementation", title: "Reference Implementation", optional: true },
+  {
+    key: "referenceImplementation",
+    title: "Reference Implementation",
+    optional: true,
+  },
   { key: "securityConsiderations", title: "Security Considerations" },
   { key: "copyright", title: "Copyright" },
 ];
@@ -35,7 +47,8 @@ export function formatEipForSubmit(data: EipFormSubmitData): string {
   PREAMBLE_ORDER.forEach((key) => {
     let value = data[key];
 
-    if (key === "title" && typeof value === "string") value = value.trim().replace(/\.$/, ""); // Remove trailing period from title
+    if (key === "title" && typeof value === "string")
+      value = value.trim().replace(/\.$/, ""); // Remove trailing period from title
     if (key === "requires" && Array.isArray(value)) value = value.join(","); // Should be string already from form logic
 
     if (value !== undefined && value !== null && String(value).trim() !== "") {
@@ -45,7 +58,12 @@ export function formatEipForSubmit(data: EipFormSubmitData): string {
       preambleLines.push(`${key}: ${String(value).trim()}`);
     } else if (key === "eip" && !value) {
       // Do not add empty eip: line if eip number is not set (for new proposals)
-    } else if ((key === "requires" || key === "category" || key === "withdrawalReason") && !value) {
+    } else if (
+      (key === "requires" ||
+        key === "category" ||
+        key === "withdrawalReason") &&
+      !value
+    ) {
       // These optional/conditional fields should not be added if empty
     } else {
       // For other potentially optional fields that are empty but should be in preamble if empty by spec (rare)
@@ -59,9 +77,16 @@ export function formatEipForSubmit(data: EipFormSubmitData): string {
   SECTION_ORDER.forEach((section) => {
     const content = (data[section.key] as string | undefined)?.trim();
 
-    if (content && content.toLowerCase() !== "tbd" && !(section.optional && content === "")) {
+    if (
+      content &&
+      content.toLowerCase() !== "tbd" &&
+      !(section.optional && content === "")
+    ) {
       bodySections.push(`## ${section.title}\n\n${content}`);
-    } else if (!section.optional && (!content || content.toLowerCase() === "tbd")) {
+    } else if (
+      !section.optional &&
+      (!content || content.toLowerCase() === "tbd")
+    ) {
       // For required sections (like Abstract, Spec, Security, Copyright)
       // if they are empty or just TBD from a template, ensure they are included with TBD
       // (though validation should catch missing content for required sections before submission)
@@ -81,8 +106,12 @@ ${bodyString}\n`; // Ensure a trailing newline
 
 // Example for generating a filename (simplified)
 // eip-draft_shortTitle.md
-export function generateEipFilename(title: string | undefined, eipNumber?: string | number | null, status?: string): string {
-  if (eipNumber && status !== "Draft") {
+export function generateEipFilename(
+  title: string | undefined,
+  eipNumber?: string | number | null,
+  // status?: string,
+): string {
+  if (eipNumber) {
     // For existing, non-draft EIPs
     return `eip-${eipNumber}.md`;
   }
