@@ -703,7 +703,7 @@ export default function EipForm({
       // Include GitHub token in submission data
       const submissionData: Omit<SubmissionData, "githubUser"> = {
         rawSubmitData: output,
-        fullMarkdown: markdown,
+        fullMarkdown: formatEipForSubmit(output),
         filename,
         githubInstallationId: effectiveInstallationId,
         userToken: effectiveGithubUser?.token || null,
