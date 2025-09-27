@@ -407,9 +407,23 @@ export function GitHubAuth({ onAuthChange }: GitHubAuthProps) {
             Failed to check GitHub App installation:{" "}
             {installationsError.message}
           </Text>
-          <Button size="sm" variant="light" onClick={handleRefreshInstallation}>
-            Retry
-          </Button>
+          <Group gap="sm">
+            <Button
+              size="sm"
+              variant="light"
+              onClick={handleRefreshInstallation}
+            >
+              Retry
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              color="red"
+              onClick={handleDisconnect}
+            >
+              Clear GitHub Tokens
+            </Button>
+          </Group>
         </Stack>
       </Alert>
     );
