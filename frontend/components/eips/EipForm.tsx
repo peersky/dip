@@ -34,15 +34,9 @@ import { GitHubAuth } from "@/components/GitHubAuth";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { ErrorDisplay } from "@/components/shared/ErrorDisplay";
 import { IconCheck, IconX, IconGitPullRequest } from "@tabler/icons-react";
+import MarkdownEditor from "@/components/shared/MarkdownEditor";
 
 // Dynamically import MarkdownEditor with SSR turned off
-const MarkdownEditor = dynamic(
-  () => import("@/components/shared/MarkdownEditor"),
-  {
-    ssr: false,
-    loading: () => <LoadingSpinner size="sm" message="Loading editor..." />,
-  },
-);
 
 // Helper functions (can be moved to eip-utils.ts later)
 const parseEipSectionsFromMarkdown = (
@@ -183,14 +177,14 @@ interface EipFormValues {
   title: string;
   description: string;
   author: string;
-  discussionsTo: string;
+  "discussions-to": string;
   status: string;
   type: string;
   category?: string;
   created: string;
   requires?: string[] | string;
   withdrawalReason?: string;
-  mainContent: string;
+  // mainContent: string;
 }
 
 interface EipFormInitialData {
@@ -198,7 +192,7 @@ interface EipFormInitialData {
   title?: string;
   description?: string;
   author?: string;
-  discussionsTo?: string;
+  "discussions-to"?: string;
   status?: string;
   type?: string;
   category?: string;
@@ -282,14 +276,14 @@ const initialEipFormValues: EipFormValues = {
   title: "",
   description: "",
   author: "",
-  discussionsTo: "",
+  "discussions-to": "",
   status: "Draft",
   type: "Standards Track",
   category: "Core",
   created: new Date().toISOString().split("T")[0],
   requires: [],
   withdrawalReason: "",
-  mainContent: defaultMainContent,
+  // mainContent: defaultMainContent,
 };
 
 const eipStatuses = [
@@ -411,25 +405,25 @@ export default function EipForm({
     initialValues: useMemo(() => {
       const defaults = { ...initialEipFormValues };
       if (initialData) {
-        if (initialData.mainContent) {
-          defaults.mainContent = initialData.mainContent;
-        } else {
-          const sectionDataForCombination = {
-            abstract: initialData.abstract,
-            motivation: initialData.motivation,
-            specification: initialData.specification,
-            rationale: initialData.rationale,
-            backwardsCompatibility: initialData.backwardsCompatibility,
-            testCases: initialData.testCases,
-            referenceImplementation: initialData.referenceImplementation,
-            securityConsiderations: initialData.securityConsiderations,
-            copyright: initialData.copyright,
-          };
-          defaults.mainContent = combineEipSectionsToMarkdown(
-            sectionDataForCombination,
-            defaultMainContent,
-          );
-        }
+        // if (initialData.mainContent) {
+        //   defaults.mainContent = initialData.mainContent;
+        // } else {
+        const sectionDataForCombination = {
+          abstract: initialData.abstract,
+          motivation: initialData.motivation,
+          specification: initialData.specification,
+          rationale: initialData.rationale,
+          backwardsCompatibility: initialData.backwardsCompatibility,
+          testCases: initialData.testCases,
+          referenceImplementation: initialData.referenceImplementation,
+          securityConsiderations: initialData.securityConsiderations,
+          copyright: initialData.copyright,
+          // };
+          // defaults.mainContent = combineEipSectionsToMarkdown(
+          //   sectionDataForCombination,
+          //   defaultMainContent,
+          // );
+        };
 
         const preambleFields: Array<
           keyof Omit<
@@ -450,7 +444,7 @@ export default function EipForm({
           "title",
           "description",
           "author",
-          "discussionsTo",
+          "discussions-to",
           "status",
           "type",
           "category",
@@ -535,10 +529,10 @@ export default function EipForm({
       )
         errors.created = "Date: YYYY-MM-DD format.";
       if (
-        values.discussionsTo &&
-        !/^https?:\/\/[^\s]+$/.test(values.discussionsTo)
+        values["discussions-to"] &&
+        !/^https?:\/\/[^\s]+$/.test(values["discussions-to"])
       ) {
-        errors.discussionsTo = "Discussions-To must be a valid URL.";
+        errors["discussions-to"] = "Discussions-To must be a valid URL.";
       }
       if (
         values.type === "Standards Track" &&
@@ -564,15 +558,14 @@ export default function EipForm({
         }
       }
 
-      const markdownContent = values.mainContent || "";
       const missingRequiredSections = requiredSectionsHeaders.filter(
-        (sectionHeader) => !markdownContent.includes(sectionHeader),
+        (sectionHeader) => !editorState.includes(sectionHeader),
       );
 
       if (missingRequiredSections.length > 0) {
         errors.mainContent = `Missing required sections: ${missingRequiredSections.join(", ")}`;
       } else {
-        const sections = parseEipSectionsFromMarkdown(markdownContent);
+        const sections = parseEipSectionsFromMarkdown(editorState);
         if (
           !sections.abstract ||
           sections.abstract.trim() === "" ||
@@ -607,16 +600,19 @@ export default function EipForm({
       return errors;
     },
   });
+  const [editorState, setEditorState] = useState<string>(
+    initialData?.mainContent || "",
+  );
 
   useEffect(() => {
     if (activeTab === "preview") {
-      const sections = parseEipSectionsFromMarkdown(form.values.mainContent);
+      const sections = parseEipSectionsFromMarkdown(editorState);
       const tempSubmitData: Partial<EipFormSubmitData> = {
         eip: form.values.eip,
         title: form.values.title,
         description: form.values.description,
         author: form.values.author,
-        discussionsTo: form.values.discussionsTo,
+        "discussions-to": form.values["discussions-to"],
         status: form.values.status,
         type: form.values.type,
         category: form.values.category,
@@ -644,15 +640,16 @@ export default function EipForm({
     if (isSubmitting) return; // Prevent double submission
 
     setIsSubmitting(true);
+    const markdown = editorRef.current?.getMarkdown() || "";
 
     try {
-      const sections = parseEipSectionsFromMarkdown(formValues.mainContent);
+      const sections = parseEipSectionsFromMarkdown(markdown || "");
       const output: EipFormSubmitData = {
         eip: formValues.eip,
         title: formValues.title,
         description: formValues.description,
         author: formValues.author,
-        "discussions-to": formValues.discussionsTo,
+        "discussions-to": formValues["discussions-to"],
         status: formValues.status,
         type: formValues.type,
         category: formValues.category,
@@ -676,7 +673,6 @@ export default function EipForm({
         }
       });
 
-      const fullMarkdown = formatEipForSubmit(output);
       const filename = generateEipFilename(
         output.title,
         output.eip,
@@ -686,7 +682,7 @@ export default function EipForm({
       // Include GitHub token in submission data
       const submissionData: Omit<SubmissionData, "githubUser"> = {
         rawSubmitData: output,
-        fullMarkdown,
+        fullMarkdown: markdown,
         filename,
         githubInstallationId: effectiveInstallationId,
         userToken: effectiveGithubUser?.token || null,
@@ -721,13 +717,12 @@ export default function EipForm({
       title: mockEipData.title,
       description: mockEipData.description,
       author: mockEipData.author,
-      discussionsTo: mockEipData.discussionsTo,
+      "discussions-to": mockEipData.discussionsTo,
       status: mockEipData.status,
       type: mockEipData.type,
       category: mockEipData.category,
       created: mockEipData.created,
       requires: mockEipData.requires,
-      mainContent: mockEipData.mainContent,
     });
 
     // Update the markdown editor content
@@ -938,7 +933,7 @@ export default function EipForm({
                     sections: Motivation, Rationale, Backwards Compatibility,
                     Test Cases, Reference Implementation.
                   </Text>
-                  <Input.Wrapper
+                  {/*<Input.Wrapper
                     label={
                       <>
                         Main Content{" "}
@@ -954,15 +949,21 @@ export default function EipForm({
                         </Text>
                       ) : undefined
                     }
-                  >
-                    <MarkdownEditor
-                      editorRef={editorRef}
-                      content={form.values.mainContent || defaultMainContent}
-                      onChange={(markdown) =>
-                        form.setFieldValue("mainContent", markdown)
-                      }
-                    />
-                  </Input.Wrapper>
+                  >*/}
+                  <MarkdownEditor
+                    editorRef={editorRef}
+                    content={
+                      initialData?.mainContent?.slice(
+                        0,
+                        initialData?.mainContent.length,
+                      ) || ""
+                    }
+                    onChange={(markdown) => {
+                      console.log(markdown.length);
+                      setEditorState(markdown);
+                    }}
+                  />
+                  {/*</Input.Wrapper>*/}
                 </Stack>
               </Fieldset>
 

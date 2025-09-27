@@ -1,8 +1,7 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from "react";
 import {
-  MDXEditor,
   type MDXEditorMethods,
   toolbarPlugin,
   headingsPlugin,
@@ -13,12 +12,13 @@ import {
   tablePlugin,
   codeBlockPlugin,
   codeMirrorPlugin,
-} from '@mdxeditor/editor';
-import '@mdxeditor/editor/style.css';
+} from "@mdxeditor/editor";
+import "@mdxeditor/editor/style.css";
+import { ForwardRefEditor } from "./ForwardRefEditor";
 
 interface MarkdownEditorProps {
   content: string; // This will now be raw Markdown
-  onChange: (markdown: string) => void;
+  onChange?: (markdown: string) => void;
   editable?: boolean;
   editorRef?: React.MutableRefObject<MDXEditorMethods | null>;
 }
@@ -31,6 +31,43 @@ export default function MarkdownEditor({
   editable = true,
   editorRef,
 }: MarkdownEditorProps) {
+  // Configure plugins - imagePlugin removed
+  const allPlugins = [
+    toolbarPlugin({
+      toolbarContents: () => (
+        <>
+          {/* Default toolbar items will be used.
+              If specific items are needed, they can be added here explicitly.
+              Example: <UndoRedo /> <BoldItalicUnderlineToggles /> ...
+          */}
+          </>
+        ),
+      }),
+      headingsPlugin(),
+      listsPlugin(),
+      quotePlugin(),
+      thematicBreakPlugin(),
+      linkPlugin(),
+      tablePlugin(),
+      // imagePlugin removed
+      codeBlockPlugin({ defaultCodeBlockLanguage: "js" }),
+      // sandpackPlugin removed due to TypeScript configuration issues
+      codeMirrorPlugin({
+        codeBlockLanguages: {
+          js: "JavaScript",
+          css: "CSS",
+          txt: "text",
+          tsx: "TypeScript",
+          sol: "Solidity",
+        },
+      }),
+    ];
+
+  useEffect(() => {
+    if (!editorRef?.current) return;
+    console.log("MarkdownEditor content:", content);
+    editorRef.current.setMarkdown(content.toString());
+  }, [content, editorRef]);
 
   // Configure plugins - imagePlugin removed
   const allPlugins = [
@@ -42,7 +79,7 @@ export default function MarkdownEditor({
               Example: <UndoRedo /> <BoldItalicUnderlineToggles /> ...
           */}
         </>
-      )
+      ),
     }),
     headingsPlugin(),
     listsPlugin(),
@@ -51,18 +88,35 @@ export default function MarkdownEditor({
     linkPlugin(),
     tablePlugin(),
     // imagePlugin removed
-    codeBlockPlugin({ defaultCodeBlockLanguage: 'js' }),
+    codeBlockPlugin({ defaultCodeBlockLanguage: "js" }),
     // sandpackPlugin removed due to TypeScript configuration issues
-    codeMirrorPlugin({ codeBlockLanguages: { js: 'JavaScript', css: 'CSS', txt: 'text', tsx: 'TypeScript' } }),
+    codeMirrorPlugin({
+      codeBlockLanguages: {
+        js: "JavaScript",
+        css: "CSS",
+        txt: "text",
+        tsx: "TypeScript",
+      },
+    }),
   ];
+  const [content1, setContent] = useState(content);
 
   return (
-    <MDXEditor
+    <ForwardRefEditor
       ref={editorRef}
+      markdown={content}
+      onChange={(e) => {
+        console.log("trigger");
+        return onChange(e);
+      }}
+      // readOnly={false}
+      // plugins={allPlugins}
+      // className="dark-theme" // For MDXEditor's own dark theme UI
+      // Increased padding (e.g., p-4), ensured line-height with prose, full width, and no outline.
+      // contentEditableClassName="prose dark:prose-invert md:prose-lg lg:prose-xl max-w-none w-full focus:outline-none p-4 leading-relaxed"
       markdown={content}
       onChange={onChange}
       readOnly={!editable}
-      plugins={allPlugins}
       className="dark-theme" // For MDXEditor's own dark theme UI
       // Increased padding (e.g., p-4), ensured line-height with prose, full width, and no outline.
       contentEditableClassName="prose dark:prose-invert md:prose-lg lg:prose-xl max-w-none w-full focus:outline-none p-4 leading-relaxed"

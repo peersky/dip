@@ -29,6 +29,7 @@ export default {
     config: any,
     { isServer, webpack }: { isServer: boolean; webpack: any },
   ) => {
+    config.experiments = { ...config.experiments, topLevelAwait: true };
     const path = require("path");
     const envs: { [key: string]: string } = {};
     Object.keys(process.env).forEach((env) => {
@@ -84,5 +85,5 @@ export default {
     externalDir: true,
     optimizePackageImports: ["@mantine/core", "@mantine/hooks"],
   },
-  transpilePackages: ["@peeramid-labs/dip-database"],
+  transpilePackages: ["@peeramid-labs/dip-database", "@mdxeditor/editor"],
 };

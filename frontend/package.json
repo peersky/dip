@@ -20,7 +20,7 @@
     "@mantine/form": "^8.0.2",
     "@mantine/hooks": "^7.17.2",
     "@mantine/notifications": "^7.17.2",
-    "@mdxeditor/editor": "^3.33.0",
+    "@mdxeditor/editor": "^3.46.1",
     "@nivo/sankey": "^0.99.0",
     "octokit": "5.0.3",
     "@octokit/core": "^7.0.2",
