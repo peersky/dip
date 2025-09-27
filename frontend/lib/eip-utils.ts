@@ -6,7 +6,7 @@ const PREAMBLE_ORDER: Array<keyof EipFormSubmitData> = [
   "title",
   "description",
   "author",
-  "discussionsTo",
+  "discussions-to",
   "status",
   // 'last-call-deadline', // TODO: Add if form includes this
   "type",
