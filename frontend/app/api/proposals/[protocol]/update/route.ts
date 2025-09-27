@@ -14,6 +14,7 @@ interface UpdateRequestBody {
   description: string;
   githubInstallationId: string;
   eipNumber: string;
+  editTitle: string;
 }
 
 export async function POST(
