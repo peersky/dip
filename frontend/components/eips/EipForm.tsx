@@ -234,6 +234,7 @@ interface SubmissionData {
     login: string;
   };
   userToken?: string | null;
+  editTitle?: string;
 }
 
 const defaultMainContent = `## Abstract
@@ -312,6 +313,7 @@ interface EipFormProps {
     rawSubmitData: EipFormSubmitData;
     fullMarkdown: string;
     filename: string;
+    editTitle: string;
   }) => Promise<void>;
   initialData?: EipFormInitialData;
   isEditing?: boolean;
@@ -394,6 +396,7 @@ export default function EipForm({
     string | null
   >(null);
   const [githubUser, setGithubUser] = useState<any>(null);
+  const [editTitle, setEditTitle] = useState<string>("");
 
   const effectiveInstallationId =
     githubInstallationIdFromProp ?? githubInstallationId;
@@ -639,11 +642,29 @@ export default function EipForm({
   const handleFormSubmit = async (formValues: EipFormValues) => {
     if (isSubmitting) return; // Prevent double submission
 
-    setIsSubmitting(true);
-    const markdown = editorRef.current?.getMarkdown() || "";
+    // If editing without an edit title, show validation error
+    if (isEditing && !editTitle.trim()) {
+      notifications.show({
+        title: "Edit Title Required",
+        message:
+          "Please provide a brief summary of your changes (max 40 characters).",
+        color: "orange",
+      });
+      setIsSubmitting(false);
+      return;
+    }
 
+    setIsSubmitting(true);
     try {
+      const markdown = editorRef.current?.getMarkdown() || "";
+
       const sections = parseEipSectionsFromMarkdown(markdown || "");
+      // Use our local editTitle for creating the PR title or fall back to default
+      const effectiveTitle = isEditing
+        ? editTitle
+        : `Create ${formValues.title || "EIP"}`;
+      console.log("📝 PR Title:", effectiveTitle);
+
       const output: EipFormSubmitData = {
         eip: formValues.eip,
         title: formValues.title,
@@ -686,6 +707,7 @@ export default function EipForm({
         filename,
         githubInstallationId: effectiveInstallationId,
         userToken: effectiveGithubUser?.token || null,
+        editTitle: isEditing ? effectiveTitle : "New EIP",
       };
 
       await onSubmit(submissionData as any);
@@ -750,7 +772,11 @@ export default function EipForm({
       {isSubmitting && (
         <LoadingSpinner
           variant="overlay"
-          message="Preparing your EIP submission..."
+          message={
+            isEditing
+              ? "Preparing your EIP update..."
+              : "Preparing your EIP submission..."
+          }
         />
       )}
 
@@ -827,6 +853,29 @@ export default function EipForm({
                       </Text>
                     </Alert>
                   )}
+                </Fieldset>
+              )}
+
+              {/* Edit Title Input (visible when editing) */}
+              {isEditing && (
+                <Fieldset legend="Edit Summary">
+                  <Stack gap="md">
+                    <TextInput
+                      required
+                      label="Edit Title"
+                      placeholder="Brief summary of changes (max 40 chars)"
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.currentTarget.value)}
+                      maxLength={40}
+                      description="This will be used as the PR title for your changes"
+                      disabled={isSubmitting}
+                      error={
+                        isEditing && editTitle.trim().length === 0
+                          ? "Please provide a brief summary of your changes"
+                          : undefined
+                      }
+                    />
+                  </Stack>
                 </Fieldset>
               )}
 
@@ -952,14 +1001,13 @@ export default function EipForm({
                   >*/}
                   <MarkdownEditor
                     editorRef={editorRef}
-                    content={
-                      initialData?.mainContent?.slice(
-                        0,
-                        initialData?.mainContent.length,
-                      ) || ""
-                    }
+                    content={editorState || ""}
                     onChange={(markdown) => {
-                      console.log(markdown.length);
+                      console.log(
+                        "🔥 MDXEditor TYPED:",
+                        markdown.length,
+                        "chars",
+                      );
                       setEditorState(markdown);
                     }}
                   />
@@ -984,7 +1032,7 @@ export default function EipForm({
                   : effectiveInstallationId &&
                       localStorage.getItem("github_token")
                     ? isEditing
-                      ? "Update EIP (Submit PR)"
+                      ? "Submit Edit PR"
                       : "Create EIP (Submit PR)"
                     : "Complete GitHub Setup to Submit"}
               </Button>

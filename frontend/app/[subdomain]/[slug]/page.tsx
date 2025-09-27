@@ -345,6 +345,7 @@ export default function SubdomainSlugDetailPage() {
     filename: string;
     githubInstallationId: string | null;
     userToken: string | null;
+    editTitle: string;
   }) => {
     if (!proposal) return;
     if (!data.githubInstallationId || !data.userToken) {
@@ -376,6 +377,7 @@ export default function SubdomainSlugDetailPage() {
           githubInstallationId: data.githubInstallationId,
           userToken: data.userToken,
           eipNumber: proposal.proposalNumber,
+          editTitle: data.editTitle,
         }),
       });
 
@@ -632,7 +634,7 @@ export default function SubdomainSlugDetailPage() {
                       ? new Date(proposal.created).toISOString().split("T")[0]
                       : "",
                     requires: (proposal.requires || []).join(", "),
-                    discussionsTo: proposal.discussionsTo || "",
+                    "discussions-to": proposal.discussionsTo || "",
                     mainContent: latestVersion.rawMarkdown,
                     abstract: "",
                     motivation: "",
